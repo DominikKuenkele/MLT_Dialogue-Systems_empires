@@ -2,7 +2,8 @@ import {assign, Machine} from "xstate";
 
 interface GameMachineContext {
     numberOfPlayers: number;
-    sizeOfBoard: number
+    sizeOfBoard: number;
+    field: { x: string, y: number }
 }
 
 export type GameMachineEvent =
@@ -10,6 +11,13 @@ export type GameMachineEvent =
     { type: 'PROCESSED' } |
     { type: 'TURN' } |
     { type: 'GAME_ENDING' };
+
+const fields: { x: string, y: number }[] = [
+    {x: 'A', y: 5},
+    {x: 'E', y: 10},
+    {x: 'F', y: 2},
+    {x: 'C', y: 4}
+]
 
 export const gameMachine = Machine<GameMachineContext>({
     id: 'game',
@@ -24,7 +32,7 @@ export const gameMachine = Machine<GameMachineContext>({
                 TURN: {
                     target: 'processingTurn',
                     actions: [
-                        assign({sizeOfBoard: (context) => context.sizeOfBoard + 1})
+                        assign({field: fields[Math.random() * fields.length | 0]})
                     ]
                 }
             }
