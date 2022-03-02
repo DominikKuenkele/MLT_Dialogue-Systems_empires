@@ -2,11 +2,11 @@ import ReactDOM from "react-dom";
 import {HexGrid, Layout, GridGenerator} from 'react-hexgrid';
 import "./styles.scss";
 import {useMachine} from "@xstate/react";
-import {gameMachine} from "./Game"
+import {gameMachine} from "./machines/Game"
 import {inspect} from "@xstate/inspect";
-import {GameTile} from './GameTile';
-import {Status} from "./Status";
-import {GameBoard} from "./GameBoard";
+import {GameTile} from './components/GameTile';
+import {Status} from "./components/Status";
+import {GameBoard} from "./components/GameBoard";
 
 inspect({
     url: "https://statecharts.io/inspect",
