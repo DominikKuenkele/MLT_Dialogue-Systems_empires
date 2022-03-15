@@ -7,13 +7,14 @@ interface GameTileProps {
     q: number,
     r: number,
     s: number,
-    hasArrow: boolean
+    unitRef: any,
+    unitId: string
 }
 
 export function GameTile(props: GameTileProps) {
     return (
         <Hexagon q={props.q} r={props.r} s={props.s}>
-            {props.hasArrow && <GamePiece empire={""}/>}
+            {Object.entries(props.unitRef).length !== 0 && <GamePiece unitRef={props.unitRef} unitId={props.unitId}/>}
         </Hexagon>
     );
 }

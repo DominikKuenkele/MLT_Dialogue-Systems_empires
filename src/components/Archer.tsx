@@ -1,18 +1,17 @@
 import React from "react";
 import {GameBoardContext} from "./GameBoardContext";
+import {UnitProps} from "./Unit";
 
-interface ArcherProps {
-    empire: string
-}
-
-export function Archer(props: ArcherProps) {
+export function Archer(props: UnitProps) {
     const {tile_size} = React.useContext(GameBoardContext)
 
     return (
         <svg y={-tile_size / 2} x={-tile_size / 2} width={tile_size}
              height={tile_size}
              viewBox="0 0 450 450" className={"unit"}>
-            <path d="M354.295,84.173c26.361,8.117,55.507,1.468,75.511-18.533c3.905-3.905,3.905-10.237,0-14.142
+            <path
+                className={props.empire}
+                d="M354.295,84.173c26.361,8.117,55.507,1.468,75.511-18.533c3.905-3.905,3.905-10.237,0-14.142
 	c-3.905-3.905-10.236-3.906-14.142,0c-17.878,17.877-45.771,21.204-67.831,8.09C308.19,36.02,260.991,26.046,214.936,31.508
 	c-43.519,5.159-83.275,23.139-115.7,52.184L82.912,67.369c4.818-8.462,6.081-18.493,3.305-28.265
 	C82.686,26.676,73.158,17.148,60.73,13.617L14.133,0.381C10.645-0.61,6.895,0.365,4.33,2.929c-2.564,2.564-3.539,6.315-2.548,9.803

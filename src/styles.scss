@@ -59,10 +59,24 @@ svg path {
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+svg path.empire1 {
+  fill: #FF7D00;
+  stroke: #FF7D00;
+}
 
-svg.unit path {
-  fill: #001219;
-  stroke: #001219;
+svg path.empire2 {
+  fill: #78290F;
+  stroke: #78290F;
+}
+
+svg path.empire3 {
+   fill: #FFD131;
+   stroke: #FFD131;
+ }
+
+svg path.empire4 {
+  fill: #2A2B2A;
+  stroke: #2A2B2A;
 }
 
 .healthbar {

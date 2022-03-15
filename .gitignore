@@ -32,3 +32,5 @@ yarn-error.log*
 *.fls
 *.fdb_latexmk
 *.synctex.gz
+
+*.typegen.ts
