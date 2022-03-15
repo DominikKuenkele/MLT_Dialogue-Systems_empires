@@ -5,3 +5,8 @@ export enum empires {
     empire4 = 'empire4',
     unassigned = ''
 }
+
+export type location = {
+    x: number,
+    y: number
+}

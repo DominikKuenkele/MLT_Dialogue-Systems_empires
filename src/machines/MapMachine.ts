@@ -8,7 +8,7 @@ export interface MapContext {
     map: UnitRef[][];
 }
 
-interface UnitRef {
+export interface UnitRef {
     id: string,
     ref: {}
 }
@@ -202,9 +202,9 @@ export const mapMachine = createMachine<MapContext, MapEvents>({
                     const targetUnit: UnitContext = targetUnitRef.getSnapshot().context
 
                     let damage = sourceUnit.attack
-                    if (targetUnit.type === sourceUnit.effective) {
+                    if (sourceUnit.effective.includes(targetUnit.type)) {
                         damage *= 2;
-                    } else if (targetUnit.type === sourceUnit.ineffective) {
+                    } else if (sourceUnit.ineffective.includes(targetUnit.type)) {
                         damage /= 2;
                     }
                     return {
@@ -216,28 +216,6 @@ export const mapMachine = createMachine<MapContext, MapEvents>({
                     to: (context: MapContext, event: MapEvents) => context.map[event.y][event.x].ref
                 }
             ),
-            applyReceivedDamage: send(
-                (context, event) => {
-                    const sourceUnitRef = getUnit(event.id, context.map).ref
-                    const sourceUnit: UnitContext = sourceUnitRef.getSnapshot().context
-                    const targetUnitRef = context.map[event.y][event.x].ref
-                    const targetUnit: UnitContext = targetUnitRef.getSnapshot().context
-
-                    let damage = targetUnit.attack
-                    if (sourceUnit.type === targetUnit.effective) {
-                        damage *= 2;
-                    } else if (sourceUnit.type === targetUnit.ineffective) {
-                        damage /= 2;
-                    }
-                    return {
-                        type: 'DAMAGE',
-                        damage: damage
-                    }
-                },
-                {
-                    to: (context: MapContext, event: MapEvents) => getUnit(event.id, context.map).ref
-                }
-            )
         },
         guards: {
             unitExistsNot: (context: MapContext, event: MapEvents) => {

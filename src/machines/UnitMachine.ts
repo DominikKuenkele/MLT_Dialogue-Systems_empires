@@ -6,8 +6,8 @@ interface InitialUnitContext {
     type: units
     health: number,
     attack: number,
-    effective: units,
-    ineffective: units,
+    effective: units[],
+    ineffective: units[],
     moveRange: number,
     attackRange: number
 }
@@ -21,8 +21,8 @@ export const spearmanContext: InitialUnitContext = {
     type: units.Spearman,
     health: 100,
     attack: 30,
-    effective: units.Horseman,
-    ineffective: units.Archer,
+    effective: [units.Horseman],
+    ineffective: [units.Archer],
     moveRange: 2,
     attackRange: 1,
 }
@@ -31,8 +31,8 @@ export const archerContext: InitialUnitContext = {
     type: units.Archer,
     health: 100,
     attack: 30,
-    effective: units.Spearman,
-    ineffective: units.Horseman,
+    effective: [units.Spearman],
+    ineffective: [units.Horseman],
     moveRange: 2,
     attackRange: 3,
 }
@@ -41,8 +41,8 @@ export const horsemanContext: InitialUnitContext = {
     type: units.Horseman,
     health: 100,
     attack: 30,
-    effective: units.Archer,
-    ineffective: units.Spearman,
+    effective: [units.Archer],
+    ineffective: [units.Spearman],
     moveRange: 3,
     attackRange: 1,
 }

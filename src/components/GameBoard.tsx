@@ -3,7 +3,10 @@ import {GridGenerator, HexGrid, HexUtils, Layout} from "react-hexgrid";
 import {GameTile} from "./GameTile";
 import {GameBoardContext} from "./GameBoardContext";
 import {useMachine} from "@xstate/react";
-import {dummyUnit, getUnit, getUnitLocation, MapContext, MapEvents, mapMachine} from "../machines/MapMachine";
+import {dummyUnit, getUnit, getUnitLocation, MapContext, MapEvents, mapMachine, UnitRef} from "../machines/MapMachine";
+import {send} from "xstate";
+import {UnitContext} from "../machines/UnitMachine";
+import {location} from "../Util";
 
 
 function getGameBoardDimensions(number_tiles_x: number, number_tiles_y: number, tile_size: number) {
@@ -33,6 +36,13 @@ const createDefaultMap = (x: number, y: number) => {
     return defaultMap;
 }
 
+function getDistance(location1: location, location2: location, hexagons: any, number_tiles_y: number) {
+    const sourceHex = hexagons.find((hex, i: number) => hex.q === location1.x && i % number_tiles_y === location1.y);
+    const targetHex = hexagons.find((hex, i: number) => hex.q === location2.x && i % number_tiles_y === location2.y);
+
+    return HexUtils.distance(sourceHex, targetHex);
+}
+
 const map = mapMachine.withContext({
     map: createDefaultMap(15, 10)
 })
@@ -50,6 +60,42 @@ export function GameBoard(props: GameBoardProps) {
 
     const [mapState] = useMachine(map, {
         devTools: true,
+        actions: {
+            applyReceivedDamage: send(
+                (context, event) => {
+                    const [row, col] = getUnitLocation(event.id, context.map);
+                    const sourceUnitRef = getUnit(event.id, context.map).ref
+                    const sourceUnit: UnitContext = sourceUnitRef.getSnapshot().context
+                    const targetUnitRef = context.map[event.y][event.x].ref
+                    const targetUnit: UnitContext = targetUnitRef.getSnapshot().context
+
+                    const distance = getDistance(
+                        {x: col, y: row},
+                        {x: event.x, y: event.y},
+                        hexagons,
+                        number_tiles_y
+                    );
+
+                    let damage = 0
+                    if (distance <= targetUnit.attackRange) {
+                        damage = targetUnit.attack
+                        if (targetUnit.effective.includes(sourceUnit.type)) {
+                            damage *= 2;
+                        } else if (targetUnit.ineffective.includes(sourceUnit.type)) {
+                            damage /= 2;
+                        }
+                    }
+
+                    return {
+                        type: 'DAMAGE',
+                        damage: damage
+                    }
+                },
+                {
+                    to: (context: MapContext, event: MapEvents) => getUnit(event.id, context.map).ref
+                }
+            )
+        },
         guards: {
             outOfRange: (context: MapContext, event: MapEvents) => {
                 if (event.x >= number_tiles_x || event.x < 0 ||
@@ -57,11 +103,13 @@ export function GameBoard(props: GameBoardProps) {
                     return true;
                 }
                 const [row, col] = getUnitLocation(event.id, context.map);
-                const sourceHex = hexagons.find((hex, i: number) => hex.q === col && i % number_tiles_y === row);
-                const targetHex = hexagons.find((hex, i: number) => hex.q === event.x && i % number_tiles_y === event.y);
                 const sourceUnit = getUnit(event.id, context.map).ref.getSnapshot();
-
-                const distance = HexUtils.distance(sourceHex, targetHex);
+                const distance = getDistance(
+                    {x: col, y: row},
+                    {x: event.x, y: event.y},
+                    hexagons,
+                    number_tiles_y
+                );
 
                 let unitRange;
                 switch (event.type) {
