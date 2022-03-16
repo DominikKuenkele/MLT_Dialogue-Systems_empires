@@ -1,22 +1,16 @@
 import ReactDOM from "react-dom";
 import "./styles.scss";
 import {inspect} from "@xstate/inspect";
-import {Status} from "./components/Status";
-import {GameBoard} from "./components/GameBoard";
+import {Game} from "./components/Game";
 
 inspect({
     url: "https://statecharts.io/inspect",
     iframe: false
 });
 
-
-
 function App() {
     return (
-        <div className={"app"}>
-            <Status/>
-            <GameBoard/>
-        </div>
+        <Game/>
     );
 }
 
@@ -25,3 +19,4 @@ const rootElement = document.getElementById("root");
 ReactDOM.render(
     <App/>,
     rootElement);
+

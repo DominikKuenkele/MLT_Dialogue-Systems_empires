@@ -3,7 +3,8 @@ import {empires} from "../Util";
 import {units} from "../components/Unit";
 
 interface InitialUnitContext {
-    type: units
+    type: units,
+    maxHealth: number,
     health: number,
     attack: number,
     effective: units[],
@@ -19,6 +20,7 @@ export interface UnitContext extends InitialUnitContext {
 
 export const spearmanContext: InitialUnitContext = {
     type: units.Spearman,
+    maxHealth: 100,
     health: 100,
     attack: 30,
     effective: [units.Horseman],
@@ -29,6 +31,7 @@ export const spearmanContext: InitialUnitContext = {
 
 export const archerContext: InitialUnitContext = {
     type: units.Archer,
+    maxHealth: 100,
     health: 100,
     attack: 30,
     effective: [units.Spearman],
@@ -39,11 +42,23 @@ export const archerContext: InitialUnitContext = {
 
 export const horsemanContext: InitialUnitContext = {
     type: units.Horseman,
+    maxHealth: 100,
     health: 100,
     attack: 30,
     effective: [units.Archer],
     ineffective: [units.Spearman],
     moveRange: 3,
+    attackRange: 1,
+}
+
+export const baseContext: InitialUnitContext = {
+    type: units.Base,
+    maxHealth: 400,
+    health: 400,
+    attack: 40,
+    effective: [],
+    ineffective: [],
+    moveRange: 0,
     attackRange: 1,
 }
 

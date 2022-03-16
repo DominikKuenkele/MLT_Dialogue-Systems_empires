@@ -5,9 +5,11 @@ import {useActor} from "@xstate/react";
 import {Horseman} from "./Horseman";
 import {Spearman} from "./Spearman";
 import {units} from "./Unit";
+import {Base} from "./Base";
+import {ActorRef} from "xstate";
 
 interface GamePieceProps {
-    unitRef: any,
+    unitRef: ActorRef<any>,
     unitId: string
 }
 
@@ -15,7 +17,7 @@ export function GamePiece(props: GamePieceProps) {
     const [state] = useActor(props.unitRef)
     return (
         <g>
-            <HealthBar health={state.context.health}/>
+            <HealthBar health={state.context.health} maxHealth={state.context.maxHealth}/>
             {
                 (() => {
                     switch (state.context.type) {
@@ -25,6 +27,8 @@ export function GamePiece(props: GamePieceProps) {
                             return <Horseman empire={state.context.empire}/>
                         case units.Spearman:
                             return <Spearman empire={state.context.empire}/>
+                        case units.Base:
+                            return <Base empire={state.context.empire}/>
                     }
                 })()
             }

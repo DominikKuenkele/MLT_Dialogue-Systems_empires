@@ -4,7 +4,8 @@ export enum units {
     Archer,
     Horseman,
     Spearman,
-    Worker
+    Worker,
+    Base
 }
 
 export interface UnitProps {

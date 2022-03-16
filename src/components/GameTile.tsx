@@ -1,13 +1,14 @@
 import React from 'react';
 import {Hexagon} from 'react-hexgrid';
 import {GamePiece} from "./GamePiece";
+import {ActorRef} from "xstate";
 
 
 interface GameTileProps {
     q: number,
     r: number,
     s: number,
-    unitRef: any,
+    unitRef: ActorRef<any>,
     unitId: string
 }
 
