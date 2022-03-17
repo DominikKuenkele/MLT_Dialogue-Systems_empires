@@ -1,5 +1,4 @@
-import {actions, assign, createMachine} from "xstate";
-
+import {actions, assign, MachineConfig} from "xstate";
 import createSpeechRecognitionPonyfill from 'web-speech-cognitive-services/lib/SpeechServices/SpeechToText';
 import createSpeechSynthesisPonyfill from 'web-speech-cognitive-services/lib/SpeechServices/TextToSpeech';
 
@@ -18,7 +17,7 @@ const getAuthorizationToken = () => (
     })).then(data => data.text()));
 
 
-export const createSpeechRecognitionMachine = createMachine<SDSContext, SDSEvent>({
+export const speechRecognitionMachine: MachineConfig<DialogueContext, any, DialogueEvents> = {
     id: 'speechRecMachine',
     initial: 'init',
     states: {
@@ -120,7 +119,8 @@ export const createSpeechRecognitionMachine = createMachine<SDSContext, SDSEvent
                 },
                 RECOGNISED: 'idle',
                 SELECT: 'idle',
-                CLICK: '.pause'
+                CLICK: '.pause',
+                RECSTOP: 'idle'
             },
             states: {
                 noinput: {
@@ -160,5 +160,5 @@ export const createSpeechRecognitionMachine = createMachine<SDSContext, SDSEvent
         },
         fail: {}
     }
-});
+};
 

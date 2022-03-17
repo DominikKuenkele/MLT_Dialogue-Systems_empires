@@ -4,6 +4,7 @@ declare module 'react-speech-kit';
 declare module 'web-speech-cognitive-services/lib/SpeechServices/TextToSpeech';
 declare module 'web-speech-cognitive-services/lib/SpeechServices/SpeechToText';
 
+
 interface Hypothesis {
     "utterance": string;
     "confidence": number
@@ -17,7 +18,7 @@ interface MySpeechRecognition extends SpeechRecognition {
     new(s: string);
 }
 
-interface SDSContext {
+interface DialogueContext {
     asr: SpeechRecognition;
     tts: SpeechSynthesis;
     voice: SpeechSynthesisVoice;
@@ -35,9 +36,11 @@ interface SDSContext {
     tdmExpectedAlternatives: any;
     azureAuthorizationToken: string;
     audioCtx: any;
+
+    listener: MachineRef;
 }
 
-type SDSEvent =
+type DialogueEvents =
     | { type: 'TTS_READY' }
     | { type: 'TTS_ERROR' }
     | { type: 'CLICK' }
@@ -49,4 +52,20 @@ type SDSEvent =
     | { type: 'ENDSPEECH' }
     | { type: 'LISTEN' }
     | { type: 'TIMEOUT' }
+    | { type: 'RECSTOP' }
+    | { type: 'REGISTER', value: string }
     | { type: 'SPEAK', value: string };
+
+
+declare module 'react-hexgrid';
+
+type HexagonType = {
+    q: number,
+    r: number,
+    s: number
+}
+
+type HexGridType = HexagonType[]
+
+
+declare module 'uuid-v4';

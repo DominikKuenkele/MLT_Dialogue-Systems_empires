@@ -10,7 +10,7 @@ interface GameContext {
     aiEmpirePile: MachineRef[],
     gameBoard: MachineRef,
 
-    speechMachineRef: MachineRef,
+    dialogueMachine: MachineRef,
     machinesReady: number,
     running: boolean
 }
@@ -26,7 +26,7 @@ type GameEvents =
         type: 'EMPIRE_READY'
     };
 
-export const gameMachine = (speechMachineRef: MachineRef) => createMachine<GameContext, GameEvents>({
+export const gameMachine = (dialogueMachine: MachineRef) => createMachine<GameContext, GameEvents>({
         id: 'game',
         context: {
             userEmpire: dummyRef,
@@ -36,7 +36,7 @@ export const gameMachine = (speechMachineRef: MachineRef) => createMachine<GameC
             gameBoard: dummyRef,
             machinesReady: 0,
             running: false,
-            speechMachineRef: speechMachineRef
+            dialogueMachine: dialogueMachine
         },
         initial: 'idle',
         states: {
@@ -159,8 +159,7 @@ export const gameMachine = (speechMachineRef: MachineRef) => createMachine<GameC
                         id: uuid(),
                         empire: empires.empire4,
                         gameBoard: context.gameBoard,
-                        speechMachineRef: context.speechMachineRef,
-                        dialogueMachine: dummyRef
+                        dialogueMachine: context.dialogueMachine,
                     };
                     return {
                         id: empire.id,
@@ -171,38 +170,38 @@ export const gameMachine = (speechMachineRef: MachineRef) => createMachine<GameC
             createAIEmpires: assign({
                 aiEmpireQueue: (context) => {
                     let list: MachineRef[] = [];
-                    // const empire1 = {
-                    //     id: uuid(),
-                    //     empire: empires.empire1,
-                    //     gameBoard: context.gameBoard,
-                    //     dialogueMachine: dummyRef
-                    // };
-                    // list.push({
-                    //     id: empire1.id,
-                    //     ref: spawn(createEmpireMachine(empire1))
-                    // });
-                    //
-                    // const empire2 = {
-                    //     id: uuid(),
-                    //     empire: empires.empire2,
-                    //     gameBoard: context.gameBoard,
-                    //     dialogueMachine: dummyRef
-                    // };
-                    // list.push({
-                    //     id: empire2.id,
-                    //     ref: spawn(createEmpireMachine(empire2))
-                    // });
-                    //
-                    // const empire3 = {
-                    //     id: uuid(),
-                    //     empire: empires.empire3,
-                    //     gameBoard: context.gameBoard,
-                    //     dialogueMachine: dummyRef
-                    // };
-                    // list.push({
-                    //     id: empire3.id,
-                    //     ref: spawn(createEmpireMachine(empire3))
-                    // });
+                    const empire1 = {
+                        id: uuid(),
+                        empire: empires.empire1,
+                        gameBoard: context.gameBoard,
+                        dialogueMachine: dummyRef
+                    };
+                    list.push({
+                        id: empire1.id,
+                        ref: spawn(createEmpireMachine(empire1))
+                    });
+
+                    const empire2 = {
+                        id: uuid(),
+                        empire: empires.empire2,
+                        gameBoard: context.gameBoard,
+                        dialogueMachine: dummyRef
+                    };
+                    list.push({
+                        id: empire2.id,
+                        ref: spawn(createEmpireMachine(empire2))
+                    });
+
+                    const empire3 = {
+                        id: uuid(),
+                        empire: empires.empire3,
+                        gameBoard: context.gameBoard,
+                        dialogueMachine: dummyRef
+                    };
+                    list.push({
+                        id: empire3.id,
+                        ref: spawn(createEmpireMachine(empire3))
+                    });
 
                     return list;
                 }

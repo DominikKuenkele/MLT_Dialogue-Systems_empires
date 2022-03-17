@@ -6,8 +6,8 @@ import uuid from "uuid-v4";
 import {createGameBoardMachine} from "../machines/GameBoardMachine";
 import {dummyRef} from "../Util";
 import {GameBoard} from "./GameBoard";
+import {createDialogueMachine} from "../machines/DialogueMachine";
 import createSpeechRecognitionPonyfill from "web-speech-cognitive-services/lib/SpeechServices/SpeechToText";
-import {createSpeechRecognitionMachine} from "../machines/SpeechRecognitionMachine";
 
 
 const createDefaultGameBoard = (x: number, y: number) => {
@@ -36,7 +36,7 @@ export function Game() {
     const tile_size = 6;
 
     const REGION = 'northeurope';
-    const [speechState, speechSend, speechInterpreter] = useMachine(createSpeechRecognitionMachine, {
+    const [speechState, speechSend, speechInterpreter] = useMachine(createDialogueMachine, {
             devTools: true,
             actions: {
                 recStart: asEffect((context) => {
@@ -92,12 +92,12 @@ export function Game() {
                     }
                 }),
 
-                recLogResult: (context: SDSContext) => {
+                recLogResult: (context: DialogueContext) => {
                     /* context.recResult = event.recResult; */
                     console.log('U>', context.recResult[0]["utterance"], context.recResult[0]["confidence"]);
                 },
                 logIntent:
-                    (context: SDSContext) => {
+                    (context: DialogueContext) => {
                         /* context.nluData = event.data */
                         console.log('<< NLU intent: ' + context.nluData.intent.name)
                     }
