@@ -10,6 +10,7 @@ interface GameContext {
     aiEmpirePile: MachineRef[],
     gameBoard: MachineRef,
 
+    speechMachineRef: MachineRef,
     machinesReady: number,
     running: boolean
 }
@@ -25,7 +26,7 @@ type GameEvents =
         type: 'EMPIRE_READY'
     };
 
-export const gameMachine = createMachine<GameContext, GameEvents>({
+export const gameMachine = (speechMachineRef: MachineRef) => createMachine<GameContext, GameEvents>({
         id: 'game',
         context: {
             userEmpire: dummyRef,
@@ -34,7 +35,8 @@ export const gameMachine = createMachine<GameContext, GameEvents>({
             currentEmpire: dummyRef,
             gameBoard: dummyRef,
             machinesReady: 0,
-            running: false
+            running: false,
+            speechMachineRef: speechMachineRef
         },
         initial: 'idle',
         states: {
@@ -156,7 +158,9 @@ export const gameMachine = createMachine<GameContext, GameEvents>({
                     const empire = {
                         id: uuid(),
                         empire: empires.empire4,
-                        gameBoard: context.gameBoard
+                        gameBoard: context.gameBoard,
+                        speechMachineRef: context.speechMachineRef,
+                        dialogueMachine: dummyRef
                     };
                     return {
                         id: empire.id,
@@ -167,35 +171,38 @@ export const gameMachine = createMachine<GameContext, GameEvents>({
             createAIEmpires: assign({
                 aiEmpireQueue: (context) => {
                     let list: MachineRef[] = [];
-                    const empire1 = {
-                        id: uuid(),
-                        empire: empires.empire1,
-                        gameBoard: context.gameBoard
-                    };
-                    list.push({
-                        id: empire1.id,
-                        ref: spawn(createEmpireMachine(empire1))
-                    });
-
-                    const empire2 = {
-                        id: uuid(),
-                        empire: empires.empire2,
-                        gameBoard: context.gameBoard
-                    };
-                    list.push({
-                        id: empire2.id,
-                        ref: spawn(createEmpireMachine(empire2))
-                    });
-
-                    const empire3 = {
-                        id: uuid(),
-                        empire: empires.empire3,
-                        gameBoard: context.gameBoard
-                    };
-                    list.push({
-                        id: empire3.id,
-                        ref: spawn(createEmpireMachine(empire3))
-                    });
+                    // const empire1 = {
+                    //     id: uuid(),
+                    //     empire: empires.empire1,
+                    //     gameBoard: context.gameBoard,
+                    //     dialogueMachine: dummyRef
+                    // };
+                    // list.push({
+                    //     id: empire1.id,
+                    //     ref: spawn(createEmpireMachine(empire1))
+                    // });
+                    //
+                    // const empire2 = {
+                    //     id: uuid(),
+                    //     empire: empires.empire2,
+                    //     gameBoard: context.gameBoard,
+                    //     dialogueMachine: dummyRef
+                    // };
+                    // list.push({
+                    //     id: empire2.id,
+                    //     ref: spawn(createEmpireMachine(empire2))
+                    // });
+                    //
+                    // const empire3 = {
+                    //     id: uuid(),
+                    //     empire: empires.empire3,
+                    //     gameBoard: context.gameBoard,
+                    //     dialogueMachine: dummyRef
+                    // };
+                    // list.push({
+                    //     id: empire3.id,
+                    //     ref: spawn(createEmpireMachine(empire3))
+                    // });
 
                     return list;
                 }

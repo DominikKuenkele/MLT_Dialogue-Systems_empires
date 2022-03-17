@@ -1,10 +1,14 @@
-import {createMachine, send, sendParent} from "xstate";
+import {assign, createMachine, send, sendParent, spawn} from "xstate";
 import {empires, MachineRef} from "../Util";
+import {createDialogueMachine} from "./DialogueMachine";
+import uuid from "uuid-v4";
 
 export interface EmpireContext {
     id: string,
     empire: empires,
-    gameBoard: MachineRef
+    gameBoard: MachineRef,
+    dialogueMachine: MachineRef,
+    speechMachineRef: MachineRef
 }
 
 type EmpireEvents =
@@ -23,14 +27,27 @@ export const createEmpireMachine = (initialContext: EmpireContext) => createMach
     initial: 'settingUp',
     states: {
         settingUp: {
-            entry: send((context) => ({
-                    type: 'REGISTER',
-                    empire: context.empire
+            entry: [
+                assign({
+                    dialogueMachine: context => {
+                        return {
+                            id: uuid(),
+                            ref: spawn(createDialogueMachine({
+                                    speechRecMachine: context.speechMachineRef
+                                })
+                            )
+                        }
+                    }
                 }),
-                {
-                    to: context => context.gameBoard.ref
-                }
-            ),
+                send((context) => ({
+                        type: 'REGISTER',
+                        empire: context.empire
+                    }),
+                    {
+                        to: context => context.gameBoard.ref
+                    }
+                )
+            ],
             on: {
                 REGISTERED: [
                     {

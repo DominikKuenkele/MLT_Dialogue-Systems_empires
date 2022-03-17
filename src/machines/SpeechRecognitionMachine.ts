@@ -1,8 +1,7 @@
-import {actions, assign, Machine} from "xstate";
+import {actions, assign, createMachine} from "xstate";
 
 import createSpeechRecognitionPonyfill from 'web-speech-cognitive-services/lib/SpeechServices/SpeechToText';
 import createSpeechSynthesisPonyfill from 'web-speech-cognitive-services/lib/SpeechServices/TextToSpeech';
-import {asEffect} from "@xstate/react";
 
 
 const {send, cancel} = actions;
@@ -19,8 +18,8 @@ const getAuthorizationToken = () => (
     })).then(data => data.text()));
 
 
-const speechRecognitionMachine = Machine<SDSContext, any, SDSEvent>({
-    id: 'root',
+export const createSpeechRecognitionMachine = createMachine<SDSContext, SDSEvent>({
+    id: 'speechRecMachine',
     initial: 'init',
     states: {
         init: {
@@ -135,7 +134,7 @@ const speechRecognitionMachine = Machine<SDSContext, any, SDSEvent>({
                             }
                         )],
                     on: {
-                        TIMEOUT: '#root.asrtts.idle',
+                        TIMEOUT: '#speechRecMachine.idle',
                         STARTSPEECH: 'inprogress'
                     },
                     exit: cancel('timeout')
@@ -160,73 +159,6 @@ const speechRecognitionMachine = Machine<SDSContext, any, SDSEvent>({
             exit: 'ttsStop',
         },
         fail: {}
-    }
-});
-
-export const test = speechRecognitionMachine.withConfig({
-    actions: {
-        recStart: asEffect((context) => {
-            context.asr.start()
-            /* console.log('Ready to receive a voice input.'); */
-        }),
-        recStop: asEffect((context) => {
-            context.asr.abort()
-            /* console.log('Recognition stopped.'); */
-        }),
-        ttsStart: asEffect((context) => {
-            let content = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="http://www.w3.org/2001/mstts" xml:lang="en-US"><voice name="${context.voice.name}">`
-            content = content + (process.env.REACT_APP_TTS_LEXICON ? `<lexicon uri="${process.env.REACT_APP_TTS_LEXICON}"/>` : "")
-            content = content + `${context.ttsAgenda}</voice></speak>`
-            console.debug(content)
-            const utterance = new context.ttsUtterance(content);
-            console.log("S>", context.ttsAgenda)
-            utterance.voice = context.voice
-            utterance.onend = () => send('ENDSPEECH')
-            context.tts.speak(utterance)
-        }),
-        ttsStop: asEffect((context) => {
-            /* console.log('TTS STOP...'); */
-            context.tts.cancel()
-        }),
-        ponyfillASR: asEffect((context, _event) => {
-            const
-                {SpeechRecognition}
-                    = createSpeechRecognitionPonyfill({
-                    audioContext: context.audioCtx,
-                    credentials: {
-                        region: REGION,
-                        authorizationToken: context.azureAuthorizationToken,
-                    }
-                });
-            context.asr = new SpeechRecognition()
-            context.asr.lang = process.env.REACT_APP_ASR_LANGUAGE || 'en-US'
-            context.asr.continuous = true
-            context.asr.interimResults = true
-            context.asr.onresult = function (event: any) {
-                var result = event.results[0]
-                if (result.isFinal) {
-                    send({
-                        type: "ASRRESULT", value:
-                            [{
-                                "utterance": result[0].transcript,
-                                "confidence": result[0].confidence
-                            }]
-                    })
-                } else {
-                    send({type: "STARTSPEECH"});
-                }
-            }
-        }),
-
-        recLogResult: (context: SDSContext) => {
-            /* context.recResult = event.recResult; */
-            console.log('U>', context.recResult[0]["utterance"], context.recResult[0]["confidence"]);
-        },
-        logIntent:
-            (context: SDSContext) => {
-                /* context.nluData = event.data */
-                console.log('<< NLU intent: ' + context.nluData.intent.name)
-            }
     }
 });
 
