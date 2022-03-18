@@ -12,14 +12,60 @@ import {
 } from "xstate";
 import {MachineRef} from "../Util";
 import {EmpireContext, EmpireEvents} from "./EmpireMachine";
+import {units} from "../components/Unit";
 
-const rasaurl = 'https://speechstate-lt2216-kuenkele.herokuapp.com/model/parse';
+const rasaurl = 'https://empires-kuenkele.herokuapp.com/model/parse';
 const nluRequest = (text: string) =>
     fetch(new Request(rasaurl, {
         method: 'POST',
         body: `{"text": "${text}"}`
     }))
         .then(data => data.json());
+
+type rasa_response_entity = {
+    entity: string,
+    start: number,
+    end: number,
+    value: string,
+    extractor: string
+}
+
+const unitGrammar = [
+    {
+        unit: units.Archer,
+        patterns: [
+            /archer/,
+            /bowman/
+        ]
+    },
+    {
+        unit: units.Horseman,
+        patterns: [
+            /horsem[ae]n/,
+            /knight/,
+            /rider/,
+            /cavalry/
+        ]
+    },
+    {
+        unit: units.Spearman,
+        patterns: [
+            /spearm[ae]n/,
+            /lance/
+        ]
+    }
+]
+
+const machineAnswers: { [index: string]: Array<string> } = {
+    "CR": [
+        "Sorry, could you please repeat that?",
+        "I didn't catch that?",
+        "What did you say?",
+        "Come again?",
+        "Sorry?",
+        "Huh?"
+    ]
+}
 
 function say(text: (context: UserEmpireContext) => string): Action<UserEmpireContext, any> {
     return send((context: UserEmpireContext) => ({
@@ -41,6 +87,13 @@ function getPrompts(prompt: ((context: UserEmpireContext) => string)[]): StatesC
     let state: StatesConfig<UserEmpireContext, any, UserEmpireEvents> = {
         hist: {
             type: 'history'
+        },
+        nomatch: {
+            entry: say(() => machineAnswers["CR"][Math.random() * machineAnswers["CR"].length | 0]),
+            on: {ENDSPEECH: 'ask0'}
+        },
+        final: {
+            type: 'final'
         }
     };
 
@@ -69,6 +122,38 @@ function getPrompts(prompt: ((context: UserEmpireContext) => string)[]): StatesC
     return state;
 }
 
+function formFillingPromptMachine(prompt: [(context: UserEmpireContext) => string],
+                                  condition: (context: UserEmpireContext) => boolean,
+                                  target: string,
+                                  parserId: string): MachineConfig<UserEmpireContext, any, UserEmpireEvents> {
+    return {
+        initial: 'init',
+        states: {
+            ...getPrompts(prompt),
+            init: {
+                always: [
+                    {
+                        target: 'final',
+                        cond: condition
+                    },
+                    {
+                        target: 'prompt0'
+                    }
+                ]
+            }
+        },
+        on: {
+            RECOGNISED: {
+                target: `#${parserId}`,
+                actions: assign({
+                    recResult: (_c, event) => event.value
+                })
+            },
+            TIMEOUT: '.prompt0'
+        },
+        onDone: target
+    }
+}
 
 function abstractPromptMachine(prompt: ((context: UserEmpireContext) => string)[]): MachineConfig<UserEmpireContext, any, UserEmpireEvents> {
     return {
@@ -81,7 +166,20 @@ function abstractPromptMachine(prompt: ((context: UserEmpireContext) => string)[
 
 export interface UserEmpireContext extends EmpireContext {
     speechRecognitionMachine: MachineRef
-    recResult: Hypothesis
+    recResult: Hypothesis,
+    errorMessage: string,
+    command: {
+        utterance: {
+            sourceUnit: string,
+            target: string
+        },
+        translated: {
+            id: string,
+            x: number,
+            y: number
+        }
+    },
+    units: []
 }
 
 export type UserEmpireEvents =
@@ -92,112 +190,516 @@ export type UserEmpireEvents =
     | { type: 'ENDSPEECH' }
     | { type: 'REPROMPT' }
 
+    | { type: 'UNITS', units: [] }
+
 export const createUserEmpireMachine = (initialContext: UserEmpireContext) => createMachine<UserEmpireContext, UserEmpireEvents>({
-    id: 'userEmpire',
-    context: {
-        ...initialContext
-    },
-    initial: 'settingUp',
-    states: {
-        settingUp: {
-            initial: 'registerAtGameBoard',
-            states: {
-                registerAtGameBoard: {
-                    entry: 'registerAtGameBoard',
-                    on: {
-                        REGISTERED: 'registerAtSRM'
+        id: 'userEmpire',
+        context: {
+            ...initialContext
+        },
+        initial: 'settingUp',
+        states: {
+            settingUp: {
+                initial: 'registerAtGameBoard',
+                states: {
+                    registerAtGameBoard: {
+                        entry: 'registerAtGameBoard',
+                        on: {
+                            REGISTERED: 'registerAtSRM'
+                        }
+                    },
+                    registerAtSRM: {
+                        entry: 'registerAtSRM',
+                        on: {
+                            REGISTERED: 'startSRM'
+                        }
+                    },
+                    startSRM: {
+                        entry: sendToSRM('CLICK'),
+                        on: {
+                            TTS_READY: 'final'
+                        }
+                    },
+                    final: {
+                        entry: sendParent('EMPIRE_READY'),
+                        type: 'final'
                     }
                 },
-                registerAtSRM: {
-                    entry: 'registerAtSRM',
-                    on: {
-                        REGISTERED: 'startSRM'
+                onDone: 'waiting'
+            },
+            turn: {
+                initial: 'fetchMovableUnits',
+                states: {
+                    fetchMovableUnits: {
+                        entry: send(context => ({
+                                type: 'GET_MOVES',
+                                empire: context.empire
+                            }), {
+                                to: context => context.gameBoard.ref
+                            }
+                        ),
+                        on: {
+                            UNITS: {
+                                target: 'getCommand',
+                                actions: assign({
+                                    units: (_c, event: UserEmpireEvents) => event.units
+                                })
+                            }
+
+                        }
+                    },
+                    getCommand: {
+                        ...abstractPromptMachine([
+                            () => 'What is your move?',
+                            () => 'It is your turn.'
+                        ]),
+                        on: {
+                            RECOGNISED: {
+                                target: 'parseCommand',
+                                actions: assign({
+                                    recResult: (_c, event) => event.value
+                                })
+                            },
+                            TIMEOUT: {
+                                target: '.hist',
+                                actions: send('REPROMPT')
+                            }
+                        }
+                    },
+                    parseCommand: {
+                        invoke: {
+                            src: context => nluRequest(context.recResult.utterance),
+                            onDone: [
+                                {
+                                    cond: (_, event) => event.data['intent']['name'] === 'move',
+                                    target: 'move'
+                                },
+                                {
+                                    cond: (_, event) => event.data['intent']['name'] === 'attack',
+                                    target: 'attack'
+                                },
+                                {
+                                    cond: (_, event) => event.data['intent']['name'] === 'request',
+                                    target: 'request'
+                                },
+                                {
+                                    cond: (_, event) => event.data['intent']['name'] === 'produce',
+                                    target: 'produce'
+                                }
+                            ],
+                            onError: 'getCommand.hist'
+
+                        }
+                    },
+                    move: {
+                        initial: 'parseUtterance',
+                        entry: 'resetCommand',
+                        states: {
+                            fetchInformation: {
+                                initial: 'getSourceUnit',
+                                states: {
+                                    hist: {
+                                        type: 'history'
+                                    },
+                                    getSourceUnit: {
+                                        ...formFillingPromptMachine(
+                                            [() => 'Which unit?'],
+                                            (context) => context.command.utterance.sourceUnit !== '',
+                                            'getTarget',
+                                            'move~parseUtterance')
+                                    },
+                                    getTarget: {
+                                        ...formFillingPromptMachine(
+                                            [() => 'Where do you want to move it?'],
+                                            (context) => context.command.utterance.target !== '',
+                                            'final',
+                                            'move~parseUtterance')
+                                    },
+                                    final: {
+                                        type: 'final'
+                                    }
+                                },
+                                onDone: 'translateSourceUnit'
+                            },
+                            parseUtterance: {
+                                id: 'move~parseUtterance',
+                                invoke: {
+                                    src: context => nluRequest(context.recResult.utterance),
+                                    onDone: [
+                                        {
+                                            actions: assign({
+                                                command: (context, event) => {
+                                                    // let unit: rasa_response_entity = event.data['entities'].find((element: rasa_response_entity) => element.entity === 'sourceUnit')
+                                                    // let target: rasa_response_entity = event.data['entities'].find((element: rasa_response_entity) => element.entity === 'targetField')
+
+                                                    // return {
+                                                    //     sourceUnit: unit && unit.value ? unit.value : context.command.sourceUnit,
+                                                    //     target: target && target.value ? target.value : context.command.target
+                                                    // }
+                                                    let pattern = /(Move the (.*?))? ?((Move it to|to) (.*?))?\./;
+                                                    let regexExec = pattern.exec(`${context.recResult.utterance}${context.recResult.utterance.endsWith('.') ? '' : '.'}`)
+                                                    return {
+                                                        utterance: {
+                                                            sourceUnit: (regexExec && regexExec[2]) || context.command.utterance.sourceUnit,
+                                                            target: (regexExec && regexExec[5]) || context.command.utterance.target,
+                                                        },
+                                                        translated: {
+                                                            ...context.command.translated
+                                                        }
+                                                    }
+                                                }
+                                            }),
+                                            target: 'fetchInformation.hist'
+                                        }
+                                    ],
+                                    onError: 'fetchInformation.hist'
+                                }
+                            },
+                            translateSourceUnit: {
+                                always: [
+                                    {
+                                        cond: 'validateSourceUnit',
+                                        actions: 'translateSourceUnit',
+                                        target: 'checkTargetField'
+                                    },
+                                    {
+                                        actions: assign(context => ({
+                                            command: {
+                                                ...context.command,
+                                                utterance: {
+                                                    ...context.command.utterance,
+                                                    sourceUnit: ''
+                                                }
+                                            },
+                                            errorMessage: "I couldn't find the unit. Could you specify it more?"
+                                        })),
+                                        target: 'errorMessage',
+                                    }
+                                ]
+                            },
+                            checkTargetField: {
+                                always: [
+                                    {
+                                        cond: 'validateTargetField',
+                                        actions: 'translateTargetField',
+                                        target: 'executeMove'
+                                    },
+                                    {
+                                        actions: assign((context) => ({
+                                            command: {
+                                                ...context.command,
+                                                utterance: {
+                                                    ...context.command.utterance,
+                                                    target: ''
+                                                }
+                                            },
+                                            errorMessage: "I couldn't find the field. Could you repeat it?"
+                                        })),
+                                        target: 'fetchInformation',
+                                    }
+                                ]
+                            },
+                            executeMove: {
+                                entry: [
+                                    context => console.log(context.command),
+                                    send(
+                                        context => ({
+                                            type: 'MOVE', ...context.command.translated
+                                        }), {
+                                            to: context => context.gameBoard.ref
+                                        })],
+                                on: {
+                                    OCC_ALLY: {
+                                        target: 'final',
+                                        actions: say(() => "There is one of ours, sire")
+                                    },
+                                    OCC_ENEMY: {
+                                        target: 'final',
+                                        actions: say(() => "The enemy is already there, m'lord.")
+                                    },
+                                    OUT_OF_RANGE: {
+                                        target: 'final',
+                                        actions: say(() => "We can't move so far.")
+                                    },
+                                    EXECUTED: 'final'
+                                },
+                                exit: 'resetCommand'
+                            },
+                            errorMessage: {
+                                ...abstractPromptMachine([(context) => context.errorMessage]),
+                                on: {
+                                    RECOGNISED: {
+                                        target: 'parseUtterance',
+                                        actions: assign({
+                                            recResult: (_c, event) => event.value
+                                        })
+                                    },
+                                    TIMEOUT: {
+                                        target: '.hist',
+                                        actions: send('REPROMPT')
+                                    }
+                                }
+                            },
+                            final: {
+                                type: 'final'
+                            }
+                        },
+                        onDone: 'fetchMovableUnits'
+                    },
+                    attack: {
+                        initial: 'parseUtterance',
+                        entry: 'resetCommand',
+                        states: {
+                            fetchInformation: {
+                                initial: 'getSourceUnit',
+                                states: {
+                                    hist: {
+                                        type: 'history'
+                                    },
+                                    getSourceUnit: {
+                                        ...formFillingPromptMachine(
+                                            [() => 'Which unit should attack?'],
+                                            (context) => context.command.utterance.sourceUnit !== '',
+                                            'getTarget',
+                                            'attack~parseUtterance')
+                                    },
+                                    getTarget: {
+                                        ...formFillingPromptMachine(
+                                            [() => 'Who should be attacked?'],
+                                            (context) => context.command.utterance.target !== '',
+                                            'final',
+                                            'attack~parseUtterance')
+                                    },
+                                    final: {
+                                        type: 'final'
+                                    }
+                                },
+                                onDone: 'translateSourceUnit'
+                            },
+                            parseUtterance: {
+                                id: 'attack~parseUtterance',
+                                invoke: {
+                                    src: context => nluRequest(context.recResult.utterance),
+                                    onDone: [
+                                        {
+                                            actions: assign({
+                                                command: (context, event) => {
+                                                    let pattern = /(Attack (the .*? on )?(.*?))?( ?[Ww]ith the (.*?))?\./;
+                                                    let regexExec = pattern.exec(`${context.recResult.utterance}${context.recResult.utterance.endsWith('.') ? '' : '.'}`)
+                                                    return {
+                                                        utterance: {
+                                                            sourceUnit: (regexExec && regexExec[5]) || context.command.utterance.sourceUnit,
+                                                            target: (regexExec && regexExec[3]) || context.command.utterance.target,
+                                                        },
+                                                        translated: {
+                                                            ...context.command.translated
+                                                        }
+                                                    }
+                                                }
+                                            }),
+                                            target: 'fetchInformation.hist'
+                                        }
+                                    ],
+                                    onError: 'fetchInformation.hist'
+                                }
+                            },
+                            translateSourceUnit: {
+                                always: [
+                                    {
+                                        cond: 'validateSourceUnit',
+                                        actions: 'translateSourceUnit',
+                                        target: 'checkTargetField'
+                                    },
+                                    {
+                                        actions: assign(context => ({
+                                            command: {
+                                                ...context.command,
+                                                utterance: {
+                                                    ...context.command.utterance,
+                                                    sourceUnit: ''
+                                                }
+                                            },
+                                            errorMessage: "I am not sure who should attack?"
+                                        })),
+                                        target: 'errorMessage',
+                                    }
+                                ]
+                            },
+                            checkTargetField: {
+                                always: [
+                                    {
+                                        cond: 'validateTargetField',
+                                        actions: 'translateTargetField',
+                                        target: 'executeAttack'
+                                    },
+                                    {
+                                        actions: assign((context) => ({
+                                            command: {
+                                                ...context.command,
+                                                utterance: {
+                                                    ...context.command.utterance,
+                                                    target: ''
+                                                }
+                                            },
+                                            errorMessage: "I couldn't find the field. Could you repeat it?"
+                                        })),
+                                        target: 'fetchInformation',
+                                    }
+                                ]
+                            },
+                            executeAttack: {
+                                entry: [
+                                    send(
+                                        context => ({
+                                            type: 'ATTACK', ...context.command.translated
+                                        }), {
+                                            to: context => context.gameBoard.ref
+                                        })],
+                                on: {
+                                    OCC_ALLY: {
+                                        target: 'final',
+                                        actions: say(() => "My lord, we should not attack ourselves.")
+                                    },
+                                    OCC_NOT: {
+                                        target: 'final',
+                                        actions: say(() => "But there is noone!")
+                                    },
+                                    OUT_OF_RANGE: {
+                                        target: 'final',
+                                        actions: say(() => "They are too far away, my liege!")
+                                    },
+                                    EXECUTED: 'final'
+                                },
+                                exit: 'resetCommand'
+                            },
+                            errorMessage: {
+                                ...abstractPromptMachine([(context) => context.errorMessage]),
+                                on: {
+                                    RECOGNISED: {
+                                        target: 'parseUtterance',
+                                        actions: assign({
+                                            recResult: (_c, event) => event.value
+                                        })
+                                    },
+                                    TIMEOUT: {
+                                        target: '.hist',
+                                        actions: send('REPROMPT')
+                                    }
+                                }
+                            },
+                            final: {
+                                type: 'final'
+                            }
+                        },
+                        onDone: 'fetchMovableUnits'
+                    },
+                    produce: {
+                        always: 'fetchMovableUnits'
+                    },
+                    request: {
+                        always: 'fetchMovableUnits'
                     }
-                },
-                startSRM: {
-                    entry: sendToSRM('CLICK'),
-                    on: {
-                        TTS_READY: 'final'
-                    }
-                },
-                final: {
-                    entry: sendParent('EMPIRE_READY'),
-                    type: 'final'
                 }
             },
-            onDone: 'waiting'
-        },
-        turn: {
-            initial: 'getCommand',
-            states: {
-                getCommand: {
-                    ...abstractPromptMachine([
-                        () => 'What is your move?',
-                        () => 'It is your turn.'
-                    ]),
-                    on: {
-                        RECOGNISED: {
-                            target: 'parseCommand',
-                            actions: assign({
-                                recResult: (_c, event) => event.value
-                            })
-                        },
-                        TIMEOUT: {
-                            target: '.hist',
-                            actions: send('REPROMPT')
+            waiting: {
+                on: {
+                    TURN: 'turn'
+                }
+            },
+            defeated: {
+                type: 'final'
+            },
+            victorious: {
+                type: 'final'
+            }
+        }
+    },
+    {
+        actions: {
+            resetCommand: assign<UserEmpireContext>({
+                command: {
+                    utterance: {sourceUnit: '', target: ''},
+                    translated: {id: '', x: 0, y: 0}
+                }
+            }),
+            registerAtGameBoard: send((context: UserEmpireContext) => ({
+                    type: 'REGISTER',
+                    empire: context.empire
+                }),
+                {
+                    to: context => context.gameBoard.ref
+                }
+            ),
+            registerAtSRM: sendToSRM('REGISTER'),
+            translateTargetField: assign<UserEmpireContext>({
+                command: (context) => {
+                    let pattern = /([A-Z]*)(\d*)/;
+                    let regexExec = pattern.exec(context.command.utterance.target)!;
+
+                    return {
+                        ...context.command,
+                        translated: {
+                            ...context.command.translated,
+                            x: (parseInt(regexExec[1], 36) - 10),
+                            y: parseInt(regexExec[2]) - 1
                         }
                     }
-                },
-                parseCommand: {
-                    invoke: {
-                        src: context => nluRequest(context.recResult.utterance),
-                        onDone: [
-                            {
-                                cond: (_, event) => event.data['intent']['name'] === 'move',
-                                target: 'move'
-                            },
-                            {
-                                cond: (_, event) => event.data['intent']['name'] === 'attack',
-                                target: 'attack'
-                            },
-                            {
-                                cond: (_, event) => event.data['intent']['name'] === 'request',
-                                target: 'request'
-                            }
-                        ],
-                        onError: 'getCommand.hist'
+                }
+            }),
+            translateSourceUnit: assign<UserEmpireContext>({
+                command: context => {
+                    let reqUnit = context.command.utterance.sourceUnit.toLowerCase().trim()
+                    let type: units | undefined;
 
+                    for (let unit of unitGrammar) {
+                        if(unit.patterns.some(pattern => pattern.test(reqUnit))) {
+                            type = unit.unit;
+                            break;
+                        }
                     }
-                },
-                move: {},
-                attack: {},
-                request: {}
+
+                    if (type) {
+                        let unit = context.units.find(unit => unit.type === type);
+                        if (unit) {
+                            return {
+                                ...context.command,
+                                translated: {
+                                    ...context.command.translated,
+                                    id: unit.id
+                                }
+                            }
+                        }
+                    }
+                    return context.command;
+                }
+            })
+        },
+        guards: {
+            validateSourceUnit: (context: UserEmpireContext) => {
+                let reqUnit = context.command.utterance.sourceUnit.toLowerCase().trim()
+                let type: units | undefined;
+
+                for (let unit of unitGrammar) {
+                    if(unit.patterns.some(pattern => pattern.test(reqUnit))) {
+                        type = unit.unit;
+                        break;
+                    }
+                }
+
+                if (type) {
+                    let unit = context.units.find(unit => unit.type === type);
+                    if (unit) {
+                        return true
+                    }
+                }
+                return false;
+            },
+            validateTargetField: (context: UserEmpireContext) => {
+                let pattern = /([A-Z]*)(\d*)/;
+                let regexExec = pattern.exec(context.command.utterance.target)!;
+                return regexExec[1] && regexExec[2]
             }
-        },
-        waiting: {
-            on: {
-                TURN: 'turn'
-            }
-        },
-        defeated: {
-            type: 'final'
-        },
-        victorious: {
-            type: 'final'
+
         }
     }
-
-
-}, {
-    actions: {
-        registerAtGameBoard: send((context) => ({
-                type: 'REGISTER',
-                empire: context.empire
-            }),
-            {
-                to: context => context.gameBoard.ref
-            }
-        ),
-        registerAtSRM: sendToSRM('REGISTER')
-    }
-});
+);

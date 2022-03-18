@@ -126,7 +126,7 @@ export const createSpeechRecognitionMachine = createMachine<SRMContext, SRMEvent
                         if (process.env.REACT_APP_TTS_VOICE) {
                             voiceRe = RegExp(process.env.REACT_APP_TTS_VOICE, 'u')
                         }
-                        const voice = voices.find((v: any) => voiceRe.test(v.name))!
+                        const voice = voices.find(v => voiceRe.test(v.name))!
                         if (voice) {
                             context.voice = voice
                             callback('TTS_READY')

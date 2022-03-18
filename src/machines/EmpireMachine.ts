@@ -8,12 +8,14 @@ export interface EmpireContext {
 }
 
 export type EmpireEvents =
-    {
-        type: 'TURN'
-    } |
-    {
-        type: 'REGISTERED'
-    }
+    | { type: 'TURN' }
+    | { type: 'REGISTERED' }
+    | { type: 'EXISTS_NOT' }
+    | { type: 'OCC_ALLY' }
+    | { type: 'OCC_NOT' }
+    | { type: 'OCC_ENEMY' }
+    | { type: 'OUT_OF_RANGE' }
+    | { type: 'EXECUTED' }
 
 export const createEmpireMachine = (initialContext: EmpireContext) => createMachine<EmpireContext, EmpireEvents>({
     id: 'empire',

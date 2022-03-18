@@ -5,6 +5,10 @@ body {
   background: #f0f0f0;
 }
 
+iframe {
+  display: none;
+}
+
 .app {
   justify-content: center;
   display: grid;
@@ -45,7 +49,7 @@ svg g polygon {
 }
 
 svg g text {
-  font-size: 0.3em;
+  font-size: 0.15em;
   fill: #FFFFFF;
   fill-opacity: 0.4;
   transition: fill-opacity .2s;
