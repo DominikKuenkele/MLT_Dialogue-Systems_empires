@@ -5,10 +5,9 @@ export interface EmpireContext {
     id: string,
     empire: empires,
     gameBoard: MachineRef,
-    dialogueMachine: MachineRef,
 }
 
-type EmpireEvents =
+export type EmpireEvents =
     {
         type: 'TURN'
     } |
@@ -24,24 +23,13 @@ export const createEmpireMachine = (initialContext: EmpireContext) => createMach
     initial: 'settingUp',
     states: {
         settingUp: {
-            entry: [
-                send((context) => ({
-                        type: 'REGISTER',
-                        empire: context.empire
-                    }),
-                    {
-                        to: context => context.gameBoard.ref
-                    }
-                )
-            ],
+            entry: 'registerAtGameBoard',
             on: {
-                REGISTERED: [
-                    {
-                        actions: sendParent('EMPIRE_READY'),
-                        target: 'waiting'
-                    }
-                ]
-            }
+                REGISTERED: {
+                    target: 'waiting',
+                    actions: sendParent('EMPIRE_READY')
+                }
+            },
         },
         turn: {},
         waiting: {
@@ -55,5 +43,16 @@ export const createEmpireMachine = (initialContext: EmpireContext) => createMach
         victorious: {
             type: 'final'
         }
+    }
+}, {
+    actions: {
+        registerAtGameBoard: send((context) => ({
+                type: 'REGISTER',
+                empire: context.empire
+            }),
+            {
+                to: context => context.gameBoard.ref
+            }
+        )
     }
 });

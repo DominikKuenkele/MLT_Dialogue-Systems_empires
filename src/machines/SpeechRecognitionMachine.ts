@@ -1,13 +1,15 @@
-import {actions, assign, MachineConfig} from "xstate";
-import createSpeechRecognitionPonyfill from 'web-speech-cognitive-services/lib/SpeechServices/SpeechToText';
+import {actions, assign, createMachine, forwardTo} from "xstate";
 import createSpeechSynthesisPonyfill from 'web-speech-cognitive-services/lib/SpeechServices/TextToSpeech';
+import {MachineRef} from "../Util";
+import uuid from "uuid-v4";
+import {respond} from "xstate/es/actions";
 
 
 const {send, cancel} = actions;
 
 const TOKEN_ENDPOINT = 'https://northeurope.api.cognitive.microsoft.com/sts/v1.0/issuetoken';
 const REGION = 'northeurope';
-const defaultPassivity = 10;
+const defaultPassivity = 4;
 const getAuthorizationToken = () => (
     fetch(new Request(TOKEN_ENDPOINT, {
         method: 'POST',
@@ -17,27 +19,74 @@ const getAuthorizationToken = () => (
     })).then(data => data.text()));
 
 
-export const speechRecognitionMachine: MachineConfig<DialogueContext, any, DialogueEvents> = {
+export interface SRMContext {
+    asr: SpeechRecognition;
+    tts: SpeechSynthesis;
+    voice: SpeechSynthesisVoice;
+    ttsUtterance: MySpeechSynthesisUtterance;
+    recResult: Hypothesis[];
+    hapticInput: string;
+    nluData: any;
+    ttsAgenda: string;
+    sessionId: string;
+    tdmAll: any;
+    tdmUtterance: string;
+    tdmPassivity: number;
+    tdmActions: any;
+    tdmVisualOutputInfo: any;
+    tdmExpectedAlternatives: any;
+    azureAuthorizationToken: string;
+    audioCtx: any;
+
+    listener: MachineRef;
+}
+
+export type SRMEvents =
+    | { type: 'TTS_READY' }
+    | { type: 'TTS_ERROR' }
+    | { type: 'CLICK' }
+    | { type: 'SELECT', value: any }
+    | { type: 'SHOW_ALTERNATIVES' }
+    | { type: 'STARTSPEECH' }
+    | { type: 'RECOGNISED' }
+    | { type: 'ASRRESULT', value: Hypothesis[] }
+    | { type: 'ENDSPEECH' }
+    | { type: 'LISTEN' }
+    | { type: 'TIMEOUT' }
+    | { type: 'RECSTOP' }
+    | { type: 'REPROMPT' }
+    | { type: 'SPEAK', value: string }
+    | { type: 'REGISTER' };
+
+
+export const createSpeechRecognitionMachine = createMachine<SRMContext, SRMEvents>({
     id: 'speechRecMachine',
     initial: 'init',
     states: {
         init: {
             on: {
-                CLICK: {
-                    target: 'getToken',
+                REGISTER: {
+                    target: 'setUp',
                     actions: [
-                        assign({
-                            audioCtx: (_ctx) =>
-                                new ((window as any).AudioContext || (window as any).webkitAudioContext)()
-                        }),
-                        (context) =>
-                            navigator.mediaDevices.getUserMedia({audio: true})
-                                .then(function (stream) {
-                                    context.audioCtx.createMediaStreamSource(stream)
-                                })
+                        'registerListener',
+                        respond('REGISTERED')
                     ]
                 }
             }
+        },
+        setUp: {
+            entry: [
+                assign({
+                    audioCtx: (_ctx) =>
+                        new ((window as any).AudioContext || (window as any).webkitAudioContext)()
+                }),
+                (context) =>
+                    navigator.mediaDevices.getUserMedia({audio: true})
+                        .then(function (stream) {
+                            context.audioCtx.createMediaStreamSource(stream)
+                        })
+            ],
+            always: 'getToken'
         },
         getToken: {
             invoke: {
@@ -89,7 +138,10 @@ export const speechRecognitionMachine: MachineConfig<DialogueContext, any, Dialo
                 }
             },
             on: {
-                TTS_READY: 'idle',
+                TTS_READY: {
+                    target: 'idle',
+                    actions: forwardTo(context => context.listener.ref)
+                },
                 TTS_ERROR: 'fail'
             }
         },
@@ -117,7 +169,15 @@ export const speechRecognitionMachine: MachineConfig<DialogueContext, any, Dialo
                         })],
                     target: '.match'
                 },
-                RECOGNISED: 'idle',
+                RECOGNISED: {
+                    target: 'idle',
+                    actions: send(context => ({
+                        type: 'RECOGNISED',
+                        value: context.recResult[0]
+                    }), {
+                        to: context => context.listener.ref
+                    })
+                },
                 SELECT: 'idle',
                 CLICK: '.pause',
                 RECSTOP: 'idle'
@@ -134,7 +194,10 @@ export const speechRecognitionMachine: MachineConfig<DialogueContext, any, Dialo
                             }
                         )],
                     on: {
-                        TIMEOUT: '#speechRecMachine.idle',
+                        TIMEOUT: {
+                            target: '#speechRecMachine.idle',
+                            actions: forwardTo(context => context.listener.ref)
+                        },
                         STARTSPEECH: 'inprogress'
                     },
                     exit: cancel('timeout')
@@ -152,7 +215,10 @@ export const speechRecognitionMachine: MachineConfig<DialogueContext, any, Dialo
         speaking: {
             entry: 'ttsStart',
             on: {
-                ENDSPEECH: 'idle',
+                ENDSPEECH: {
+                    target: 'idle',
+                    actions: forwardTo(context => context.listener.ref)
+                },
                 SELECT: 'idle',
                 CLICK: {target: 'idle', actions: send('ENDSPEECH')}
             },
@@ -160,5 +226,13 @@ export const speechRecognitionMachine: MachineConfig<DialogueContext, any, Dialo
         },
         fail: {}
     }
-};
-
+}, {
+    actions: {
+        registerListener: assign({
+            listener: (_c, _e, {_event}) => ({
+                id: uuid(),
+                ref: _event.origin
+            })
+        })
+    }
+});

@@ -1,13 +1,13 @@
 import {Status} from "./Status";
 import {asEffect, useMachine} from "@xstate/react";
 import {gameMachine} from "../machines/GameMachine";
-import {assign, send, spawn} from "xstate";
+import {assign, spawn} from "xstate";
 import uuid from "uuid-v4";
 import {createGameBoardMachine} from "../machines/GameBoardMachine";
 import {dummyRef} from "../Util";
 import {GameBoard} from "./GameBoard";
-import {createDialogueMachine} from "../machines/DialogueMachine";
 import createSpeechRecognitionPonyfill from "web-speech-cognitive-services/lib/SpeechServices/SpeechToText";
+import {createSpeechRecognitionMachine, SRMContext} from "../machines/SpeechRecognitionMachine";
 
 
 const createDefaultGameBoard = (x: number, y: number) => {
@@ -36,77 +36,76 @@ export function Game() {
     const tile_size = 6;
 
     const REGION = 'northeurope';
-    const [speechState, speechSend, speechInterpreter] = useMachine(createDialogueMachine, {
-            devTools: true,
-            actions: {
-                recStart: asEffect((context) => {
-                    context.asr.start()
-                    /* console.log('Ready to receive a voice input.'); */
-                }),
-                recStop: asEffect((context) => {
-                    context.asr.abort()
-                    /* console.log('Recognition stopped.'); */
-                }),
-                ttsStart: asEffect((context) => {
-                    let content = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="http://www.w3.org/2001/mstts" xml:lang="en-US"><voice name="${context.voice.name}">`
-                    content = content + (process.env.REACT_APP_TTS_LEXICON ? `<lexicon uri="${process.env.REACT_APP_TTS_LEXICON}"/>` : "")
-                    content = content + `${context.ttsAgenda}</voice></speak>`
-                    console.debug(content)
-                    const utterance = new context.ttsUtterance(content);
-                    console.log("S>", context.ttsAgenda)
-                    utterance.voice = context.voice
-                    utterance.onend = () => send('ENDSPEECH')
-                    context.tts.speak(utterance)
-                }),
-                ttsStop: asEffect((context) => {
-                    /* console.log('TTS STOP...'); */
-                    context.tts.cancel()
-                }),
-                ponyfillASR: asEffect((context, _event) => {
-                    const
-                        {SpeechRecognition}
-                            = createSpeechRecognitionPonyfill({
-                            audioContext: context.audioCtx,
-                            credentials: {
-                                region: REGION,
-                                authorizationToken: context.azureAuthorizationToken,
-                            }
-                        });
-                    context.asr = new SpeechRecognition()
-                    context.asr.lang = process.env.REACT_APP_ASR_LANGUAGE || 'en-US'
-                    context.asr.continuous = true
-                    context.asr.interimResults = true
-                    context.asr.onresult = function (event: any) {
-                        var result = event.results[0]
-                        if (result.isFinal) {
-                            send({
-                                type: "ASRRESULT", value:
-                                    [{
-                                        "utterance": result[0].transcript,
-                                        "confidence": result[0].confidence
-                                    }]
-                            })
-                        } else {
-                            send({type: "STARTSPEECH"});
+    const [speechState, speechSend, speechInterpret] = useMachine(createSpeechRecognitionMachine, {
+        devTools: true,
+        actions: {
+            recStart: asEffect((context: SRMContext) => {
+                context.asr.start()
+                /* console.log('Ready to receive a voice input.'); */
+            }),
+            recStop: asEffect((context: SRMContext) => {
+                context.asr.abort()
+                /* console.log('Recognition stopped.'); */
+            }),
+            ttsStart: asEffect((context: SRMContext) => {
+                let content = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="http://www.w3.org/2001/mstts" xml:lang="en-US"><voice name="${context.voice.name}">`
+                content = content + (process.env.REACT_APP_TTS_LEXICON ? `<lexicon uri="${process.env.REACT_APP_TTS_LEXICON}"/>` : "")
+                content = content + `${context.ttsAgenda}</voice></speak>`
+                console.debug(content)
+                const utterance = new context.ttsUtterance(content);
+                console.log("S>", context.ttsAgenda)
+                utterance.voice = context.voice
+                utterance.onend = () => speechSend('ENDSPEECH')
+                context.tts.speak(utterance)
+            }),
+            ttsStop: asEffect((context: SRMContext) => {
+                /* console.log('TTS STOP...'); */
+                context.tts.cancel()
+            }),
+            ponyfillASR: asEffect((context: SRMContext) => {
+                const
+                    {SpeechRecognition}
+                        = createSpeechRecognitionPonyfill({
+                        audioContext: context.audioCtx,
+                        credentials: {
+                            region: REGION,
+                            authorizationToken: context.azureAuthorizationToken,
                         }
+                    });
+                context.asr = new SpeechRecognition()
+                context.asr.lang = process.env.REACT_APP_ASR_LANGUAGE || 'en-US'
+                context.asr.continuous = true
+                context.asr.interimResults = true
+                context.asr.onresult = function (event: any) {
+                    let result = event.results[0]
+                    if (result.isFinal) {
+                        speechSend({
+                            type: "ASRRESULT",
+                            value: [{
+                                "utterance": result[0].transcript,
+                                "confidence": result[0].confidence
+                            }]
+                        })
+                    } else {
+                        speechSend({type: "STARTSPEECH"});
                     }
-                }),
+                }
+            }),
 
-                recLogResult: (context: DialogueContext) => {
-                    /* context.recResult = event.recResult; */
-                    console.log('U>', context.recResult[0]["utterance"], context.recResult[0]["confidence"]);
-                },
-                logIntent:
-                    (context: DialogueContext) => {
-                        /* context.nluData = event.data */
-                        console.log('<< NLU intent: ' + context.nluData.intent.name)
-                    }
-            }
+            recLogResult: (context: SRMContext) => {
+                /* context.recResult = event.recResult; */
+                console.log('U>', context.recResult[0]["utterance"], context.recResult[0]["confidence"]);
+            },
+            logIntent:
+                (context: SRMContext) => {
+                    /* context.nluData = event.data */
+                    console.log('<< NLU intent: ' + context.nluData.intent.name)
+                }
         }
-    )
+    })
     const speechMachineRef = {
-        id: '',
-        ref: speechInterpreter
+        id: uuid(),
+        ref: speechInterpret
     }
     const [gameState, gameSend] = useMachine(gameMachine(speechMachineRef), {
             devTools: true,
@@ -122,8 +121,6 @@ export function Game() {
             }
         }
     );
-
-
 
     return (
         <div className={"app"}>

@@ -2,6 +2,7 @@ import {assign, createMachine, send, spawn} from "xstate";
 import uuid from "uuid-v4";
 import {dummyRef, empires, MachineRef} from "../Util";
 import {createEmpireMachine} from "./EmpireMachine";
+import {createUserEmpireMachine} from "./UserEmpireMachine";
 
 interface GameContext {
     userEmpire: MachineRef,
@@ -10,7 +11,7 @@ interface GameContext {
     aiEmpirePile: MachineRef[],
     gameBoard: MachineRef,
 
-    dialogueMachine: MachineRef,
+    speechRecognitionMachine: MachineRef,
     machinesReady: number,
     running: boolean
 }
@@ -26,7 +27,7 @@ type GameEvents =
         type: 'EMPIRE_READY'
     };
 
-export const gameMachine = (dialogueMachine: MachineRef) => createMachine<GameContext, GameEvents>({
+export const gameMachine = (speechRecognitionMachine: MachineRef) => createMachine<GameContext, GameEvents>({
         id: 'game',
         context: {
             userEmpire: dummyRef,
@@ -36,7 +37,7 @@ export const gameMachine = (dialogueMachine: MachineRef) => createMachine<GameCo
             gameBoard: dummyRef,
             machinesReady: 0,
             running: false,
-            dialogueMachine: dialogueMachine
+            speechRecognitionMachine: speechRecognitionMachine
         },
         initial: 'idle',
         states: {
@@ -159,11 +160,11 @@ export const gameMachine = (dialogueMachine: MachineRef) => createMachine<GameCo
                         id: uuid(),
                         empire: empires.empire4,
                         gameBoard: context.gameBoard,
-                        dialogueMachine: context.dialogueMachine,
+                        speechRecognitionMachine: context.speechRecognitionMachine,
                     };
                     return {
                         id: empire.id,
-                        ref: spawn(createEmpireMachine(empire))
+                        ref: spawn(createUserEmpireMachine(empire))
                     };
                 }
             }),
@@ -173,8 +174,7 @@ export const gameMachine = (dialogueMachine: MachineRef) => createMachine<GameCo
                     const empire1 = {
                         id: uuid(),
                         empire: empires.empire1,
-                        gameBoard: context.gameBoard,
-                        dialogueMachine: dummyRef
+                        gameBoard: context.gameBoard
                     };
                     list.push({
                         id: empire1.id,
@@ -184,8 +184,7 @@ export const gameMachine = (dialogueMachine: MachineRef) => createMachine<GameCo
                     const empire2 = {
                         id: uuid(),
                         empire: empires.empire2,
-                        gameBoard: context.gameBoard,
-                        dialogueMachine: dummyRef
+                        gameBoard: context.gameBoard
                     };
                     list.push({
                         id: empire2.id,
@@ -195,8 +194,7 @@ export const gameMachine = (dialogueMachine: MachineRef) => createMachine<GameCo
                     const empire3 = {
                         id: uuid(),
                         empire: empires.empire3,
-                        gameBoard: context.gameBoard,
-                        dialogueMachine: dummyRef
+                        gameBoard: context.gameBoard
                     };
                     list.push({
                         id: empire3.id,
