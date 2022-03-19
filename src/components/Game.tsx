@@ -114,7 +114,8 @@ export function Game() {
                     gameBoard: () => ({
                         id: uuid(),
                         ref: spawn(createGameBoardMachine({
-                            gameBoard: createDefaultGameBoard(number_tiles_x, number_tiles_y)
+                            gameBoard: createDefaultGameBoard(number_tiles_x, number_tiles_y),
+                            livingEmpires: []
                         }))
                     })
                 })
@@ -122,18 +123,31 @@ export function Game() {
         }
     );
 
+    const output = () => {
+        switch (gameState.value) {
+            case 'idle':
+                //fallthrough
+            case 'settingUp:':
+                return <div onClick={() => gameSend({type: 'START'})}>Start Game</div>
+            case 'won':
+                return <div>You have won!</div>;
+            case 'lost':
+                return <div>You have won!</div>;
+            default:
+                return (
+                    <div>
+                        <Status/>
+                        <GameBoard numberTilesX={number_tiles_x}
+                                   numberTileY={number_tiles_y}
+                                   tileSize={tile_size}
+                                   gameBoardRef={gameState.context.gameBoard.ref}/>
+                    </div>
+                )
+        }
+    };
     return (
         <div className={"app"}>
-            {gameState.context.gameBoard.id !== '' ?
-                <div>
-                    <Status/>
-                    <GameBoard numberTilesX={number_tiles_x}
-                               numberTileY={number_tiles_y}
-                               tileSize={tile_size}
-                               gameBoardRef={gameState.context.gameBoard.ref}/>
-                </div> :
-                <div onClick={() => gameSend({type: 'START'})}>Start Game</div>
-            }
+            {output()}
         </div>
     )
 }

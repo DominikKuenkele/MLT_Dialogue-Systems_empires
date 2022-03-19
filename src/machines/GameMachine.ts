@@ -13,7 +13,6 @@ interface GameContext {
 
     speechRecognitionMachine: MachineRef,
     machinesReady: number,
-    running: boolean
 }
 
 type GameEvents =
@@ -25,7 +24,12 @@ type GameEvents =
     } |
     {
         type: 'EMPIRE_READY'
+    } |
+    {
+        type: 'SEND_LIVING_EMPIRES',
+        empires: empires[]
     };
+
 
 export const gameMachine = (speechRecognitionMachine: MachineRef) => createMachine<GameContext, GameEvents>({
         id: 'game',
@@ -36,7 +40,6 @@ export const gameMachine = (speechRecognitionMachine: MachineRef) => createMachi
             currentEmpire: dummyRef,
             gameBoard: dummyRef,
             machinesReady: 0,
-            running: false,
             speechRecognitionMachine: speechRecognitionMachine
         },
         initial: 'idle',
@@ -54,10 +57,7 @@ export const gameMachine = (speechRecognitionMachine: MachineRef) => createMachi
                         states: {
                             createGameBoard: {
                                 entry: 'createGameBoard',
-                                always: 'createUserEmpire',
-                                exit: assign({
-                                    running: true
-                                })
+                                always: 'createUserEmpire'
                             },
                             createUserEmpire: {
                                 entry: 'createUserEmpire',
@@ -115,7 +115,7 @@ export const gameMachine = (speechRecognitionMachine: MachineRef) => createMachi
                 ],
                 on: {
                     EMPIRE_DONE: {
-                        target: 'processingAI',
+                        target: 'processingTurn',
                         actions: 'resetCurrentEmpire'
                     }
                 }
@@ -142,16 +142,38 @@ export const gameMachine = (speechRecognitionMachine: MachineRef) => createMachi
                 ]
             },
             processingTurn: {
-                always: 'processingUser'
+                entry: send('REQ_LIVING_EMPIRES', {
+                    to: context => context.gameBoard.ref
+                }),
+                on: {
+                    SEND_LIVING_EMPIRES: [
+                        {
+                            target: 'lost',
+                            cond: 'userEmpireDead'
+                        },
+                        {
+                            target: 'won',
+                            cond: 'oneEmpireLiving'
+                        },
+                        {
+                            target: 'processingUser'
+                        }
+                    ]
+                }
             },
-            over: {}
+            won: {
+                type: 'final'
+            },
+            lost: {
+                type: 'final'
+            }
         }
     },
     {
         guards: {
-            allEmpiresDone: context => {
-                return context.aiEmpireQueue.length === 0
-            }
+            userEmpireDead: (context, event) => !event.empires.includes(context.userEmpire),
+            oneEmpireLiving: (context, event) => event.empires.length === 1,
+            allEmpiresDone: context => context.aiEmpireQueue.length === 0
         },
         actions: {
             createUserEmpire: assign({
@@ -160,11 +182,10 @@ export const gameMachine = (speechRecognitionMachine: MachineRef) => createMachi
                         id: uuid(),
                         empire: empires.empire4,
                         gameBoard: context.gameBoard,
-                        speechRecognitionMachine: context.speechRecognitionMachine,
                     };
                     return {
                         id: empire.id,
-                        ref: spawn(createUserEmpireMachine(empire))
+                        ref: spawn(createUserEmpireMachine(empire, context.speechRecognitionMachine))
                     };
                 }
             }),
@@ -181,25 +202,25 @@ export const gameMachine = (speechRecognitionMachine: MachineRef) => createMachi
                         ref: spawn(createEmpireMachine(empire1))
                     });
 
-                    const empire2 = {
-                        id: uuid(),
-                        empire: empires.empire2,
-                        gameBoard: context.gameBoard
-                    };
-                    list.push({
-                        id: empire2.id,
-                        ref: spawn(createEmpireMachine(empire2))
-                    });
-
-                    const empire3 = {
-                        id: uuid(),
-                        empire: empires.empire3,
-                        gameBoard: context.gameBoard
-                    };
-                    list.push({
-                        id: empire3.id,
-                        ref: spawn(createEmpireMachine(empire3))
-                    });
+                    // const empire2 = {
+                    //     id: uuid(),
+                    //     empire: empires.empire2,
+                    //     gameBoard: context.gameBoard
+                    // };
+                    // list.push({
+                    //     id: empire2.id,
+                    //     ref: spawn(createEmpireMachine(empire2))
+                    // });
+                    //
+                    // const empire3 = {
+                    //     id: uuid(),
+                    //     empire: empires.empire3,
+                    //     gameBoard: context.gameBoard
+                    // };
+                    // list.push({
+                    //     id: empire3.id,
+                    //     ref: spawn(createEmpireMachine(empire3))
+                    // });
 
                     return list;
                 }

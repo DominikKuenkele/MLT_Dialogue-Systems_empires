@@ -50,7 +50,7 @@ const unitGrammar = [
     {
         unit: units.Spearman,
         patterns: [
-            /spearm[ae]n/,
+            /spear ?m[ae]n/,
             /lance/
         ]
     }
@@ -164,21 +164,23 @@ function abstractPromptMachine(prompt: ((context: UserEmpireContext) => string)[
     }
 }
 
+type commandType = {
+    utterance: {
+        sourceUnit: string,
+        target: string
+    },
+    translated: {
+        id: string,
+        x: number,
+        y: number
+    }
+}
+
 export interface UserEmpireContext extends EmpireContext {
     speechRecognitionMachine: MachineRef
     recResult: Hypothesis,
     errorMessage: string,
-    command: {
-        utterance: {
-            sourceUnit: string,
-            target: string
-        },
-        translated: {
-            id: string,
-            x: number,
-            y: number
-        }
-    },
+    command: commandType,
     units: []
 }
 
@@ -192,14 +194,20 @@ export type UserEmpireEvents =
 
     | { type: 'UNITS', units: [] }
 
-export const createUserEmpireMachine = (initialContext: UserEmpireContext) => createMachine<UserEmpireContext, UserEmpireEvents>({
+export const createUserEmpireMachine = (empireContext: EmpireContext, srm: MachineRef) => createMachine<UserEmpireContext, UserEmpireEvents>({
         id: 'userEmpire',
         context: {
-            ...initialContext
+            ...empireContext,
+            speechRecognitionMachine: srm,
+            recResult: {} as Hypothesis,
+            errorMessage: '',
+            command: {} as commandType,
+            units: []
         },
         initial: 'settingUp',
         states: {
             settingUp: {
+                entry: assign({}),
                 initial: 'registerAtGameBoard',
                 states: {
                     registerAtGameBoard: {
@@ -239,12 +247,18 @@ export const createUserEmpireMachine = (initialContext: UserEmpireContext) => cr
                             }
                         ),
                         on: {
-                            UNITS: {
-                                target: 'getCommand',
-                                actions: assign({
-                                    units: (_c, event: UserEmpireEvents) => event.units
-                                })
-                            }
+                            UNITS: [
+                                {
+                                    cond: (_, event) => event.units.length > 0,
+                                    target: 'getCommand',
+                                    actions: assign({
+                                        units: (_c, event: UserEmpireEvents) => event.units
+                                    })
+                                },
+                                {
+                                    target: 'final'
+                                }
+                            ]
 
                         }
                     },
@@ -415,7 +429,7 @@ export const createUserEmpireMachine = (initialContext: UserEmpireContext) => cr
                                     },
                                     OCC_ENEMY: {
                                         target: 'final',
-                                        actions: say(() => "The enemy is already there, m'lord.")
+                                        actions: say(() => "The enemy is already there, mlord.")
                                     },
                                     OUT_OF_RANGE: {
                                         target: 'final',
@@ -598,7 +612,14 @@ export const createUserEmpireMachine = (initialContext: UserEmpireContext) => cr
                     },
                     request: {
                         always: 'fetchMovableUnits'
+                    },
+                    final: {
+                        type: 'final'
                     }
+                },
+                onDone: {
+                    target: 'waiting',
+                    actions: sendParent('EMPIRE_DONE')
                 }
             },
             waiting: {
@@ -652,7 +673,7 @@ export const createUserEmpireMachine = (initialContext: UserEmpireContext) => cr
                     let type: units | undefined;
 
                     for (let unit of unitGrammar) {
-                        if(unit.patterns.some(pattern => pattern.test(reqUnit))) {
+                        if (unit.patterns.some(pattern => pattern.test(reqUnit))) {
                             type = unit.unit;
                             break;
                         }
@@ -680,7 +701,7 @@ export const createUserEmpireMachine = (initialContext: UserEmpireContext) => cr
                 let type: units | undefined;
 
                 for (let unit of unitGrammar) {
-                    if(unit.patterns.some(pattern => pattern.test(reqUnit))) {
+                    if (unit.patterns.some(pattern => pattern.test(reqUnit))) {
                         type = unit.unit;
                         break;
                     }

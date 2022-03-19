@@ -53,8 +53,8 @@ export const horsemanContext: InitialUnitContext = {
 
 export const baseContext: InitialUnitContext = {
     type: units.Base,
-    maxHealth: 400,
-    health: 400,
+    maxHealth: 20,
+    health: 20,
     attack: 40,
     effective: [],
     ineffective: [],
@@ -97,7 +97,9 @@ export const createUnitMachine = (initialContext: UnitContext) => createMachine<
             dead: {
                 entry: sendParent((context) => ({
                         type: 'DEAD',
-                        id: context.id
+                        id: context.id,
+                        unitType: context.type,
+                        unitEmpire: context.empire
                     })
                 ),
                 type: 'final'
