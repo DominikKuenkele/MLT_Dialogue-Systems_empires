@@ -2,6 +2,7 @@ import React from 'react';
 import {Hexagon, Text} from 'react-hexgrid';
 import {GamePiece} from "./GamePiece";
 import {ActorRef} from "xstate";
+import {createUnitMachine} from "../machines/UnitMachine";
 
 
 interface GameTileProps {
@@ -17,8 +18,9 @@ function hexToChess(q: number, r: number, s: number){
 }
 
 export function GameTile(props: GameTileProps) {
+    const unitMovable = () => props.unitId !== '' && props.unitRef.getSnapshot().context.movable ? 'movable' : ''
     return (
-        <Hexagon q={props.q} r={props.r} s={props.s}>
+        <Hexagon q={props.q} r={props.r} s={props.s} className={unitMovable()}>
             {Object.entries(props.unitRef).length !== 0 && <GamePiece unitRef={props.unitRef} unitId={props.unitId}/>}
             <Text y={4.5}>{hexToChess(props.q, props.r, props.s)}</Text>
         </Hexagon>

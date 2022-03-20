@@ -16,6 +16,9 @@ export type EmpireEvents =
     | { type: 'OCC_ENEMY' }
     | { type: 'OUT_OF_RANGE' }
     | { type: 'EXECUTED' }
+    | { type: 'PROD_IN_PROGRESS' }
+    | { type: 'YES' }
+    | { type: 'NO' }
 
 export const createEmpireMachine = (initialContext: EmpireContext) => createMachine<EmpireContext, EmpireEvents>({
     id: 'empire',

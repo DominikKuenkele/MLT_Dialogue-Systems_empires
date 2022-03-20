@@ -30,6 +30,11 @@ type rasa_response_entity = {
     extractor: string
 }
 
+const binaryGrammar = {
+    "Yes": ["Yes.", "Of course.", "Sure.", "Yeah.", "Yes please.", "Yep.", "OK.", "Yes, thank you."],
+    "No": ["No.", "Nope.", "No no.", "Don't.", "Don't do it.", "No way.", "Not at all."]
+};
+
 const unitGrammar = [
     {
         unit: units.Archer,
@@ -155,6 +160,29 @@ function formFillingPromptMachine(prompt: [(context: UserEmpireContext) => strin
     }
 }
 
+function binaryPromptMachine(prompt: ((context: UserEmpireContext) => string)[]): MachineConfig<UserEmpireContext, any, UserEmpireEvents> {
+    return {
+        ...abstractPromptMachine(prompt),
+        on: {
+            RECOGNISED: [
+                {
+                    actions: send('YES'),
+                    cond: (_, event) => binaryGrammar["Yes"].includes(event.value.utterance)
+                },
+                {
+                    actions: send('NO'),
+                    cond: (_, event) => binaryGrammar["No"].includes(event.value.utterance)
+                }
+            ],
+            TIMEOUT: {
+                target: '.hist',
+                actions: send('HIST')
+            }
+        }
+    };
+}
+
+
 function abstractPromptMachine(prompt: ((context: UserEmpireContext) => string)[]): MachineConfig<UserEmpireContext, any, UserEmpireEvents> {
     return {
         initial: 'prompt0',
@@ -181,7 +209,10 @@ export interface UserEmpireContext extends EmpireContext {
     recResult: Hypothesis,
     errorMessage: string,
     command: commandType,
-    units: []
+    moves: {
+        production: boolean,
+        units: []
+    }
 }
 
 export type UserEmpireEvents =
@@ -192,7 +223,7 @@ export type UserEmpireEvents =
     | { type: 'ENDSPEECH' }
     | { type: 'REPROMPT' }
 
-    | { type: 'UNITS', units: [] }
+    | { type: 'MOVES', moves: { production: boolean, units: [] } }
 
 export const createUserEmpireMachine = (empireContext: EmpireContext, srm: MachineRef) => createMachine<UserEmpireContext, UserEmpireEvents>({
         id: 'userEmpire',
@@ -202,7 +233,10 @@ export const createUserEmpireMachine = (empireContext: EmpireContext, srm: Machi
             recResult: {} as Hypothesis,
             errorMessage: '',
             command: {} as commandType,
-            units: []
+            moves: {
+                production: false,
+                units: []
+            }
         },
         initial: 'settingUp',
         states: {
@@ -236,9 +270,9 @@ export const createUserEmpireMachine = (empireContext: EmpireContext, srm: Machi
                 onDone: 'waiting'
             },
             turn: {
-                initial: 'fetchMovableUnits',
+                initial: 'fetchMoves',
                 states: {
-                    fetchMovableUnits: {
+                    fetchMoves: {
                         entry: send(context => ({
                                 type: 'GET_MOVES',
                                 empire: context.empire
@@ -247,20 +281,24 @@ export const createUserEmpireMachine = (empireContext: EmpireContext, srm: Machi
                             }
                         ),
                         on: {
-                            UNITS: [
-                                {
-                                    cond: (_, event) => event.units.length > 0,
-                                    target: 'getCommand',
-                                    actions: assign({
-                                        units: (_c, event: UserEmpireEvents) => event.units
-                                    })
-                                },
-                                {
-                                    target: 'final'
-                                }
-                            ]
-
+                            MOVES: {
+                                target: 'verifyMoves',
+                                actions: assign({
+                                    moves: (_c, event) => event.moves
+                                })
+                            }
                         }
+                    },
+                    verifyMoves: {
+                        always: [
+                            {
+                                cond: 'movesLeft',
+                                target: 'getCommand'
+                            },
+                            {
+                                target: 'final'
+                            }
+                        ]
                     },
                     getCommand: {
                         ...abstractPromptMachine([
@@ -299,6 +337,10 @@ export const createUserEmpireMachine = (empireContext: EmpireContext, srm: Machi
                                 {
                                     cond: (_, event) => event.data['intent']['name'] === 'produce',
                                     target: 'produce'
+                                },
+                                {
+                                    cond: (_, event) => event.data['intent']['name'] === 'skip',
+                                    target: 'skip'
                                 }
                             ],
                             onError: 'getCommand.hist'
@@ -414,14 +456,12 @@ export const createUserEmpireMachine = (empireContext: EmpireContext, srm: Machi
                                 ]
                             },
                             executeMove: {
-                                entry: [
-                                    context => console.log(context.command),
-                                    send(
-                                        context => ({
-                                            type: 'MOVE', ...context.command.translated
-                                        }), {
-                                            to: context => context.gameBoard.ref
-                                        })],
+                                entry: send(
+                                    context => ({
+                                        type: 'MOVE', ...context.command.translated
+                                    }), {
+                                        to: context => context.gameBoard.ref
+                                    }),
                                 on: {
                                     OCC_ALLY: {
                                         target: 'final',
@@ -458,7 +498,7 @@ export const createUserEmpireMachine = (empireContext: EmpireContext, srm: Machi
                                 type: 'final'
                             }
                         },
-                        onDone: 'fetchMovableUnits'
+                        onDone: 'fetchMoves'
                     },
                     attack: {
                         initial: 'parseUtterance',
@@ -605,13 +645,54 @@ export const createUserEmpireMachine = (empireContext: EmpireContext, srm: Machi
                                 type: 'final'
                             }
                         },
-                        onDone: 'fetchMovableUnits'
+                        onDone: 'fetchMoves'
                     },
                     produce: {
-                        always: 'fetchMovableUnits'
+                        entry: [
+                            send(
+                                context => ({
+                                    type: 'PRODUCE',
+                                    unit: units.Archer
+                                }), {
+                                    to: context => context.gameBoard.ref
+                                })],
+                        on: {
+                            PROD_IN_PROGRESS: {
+                                target: 'fetchMoves',
+                                actions: say(() => "We already produce a unit")
+                            },
+                            EXECUTED: 'fetchMoves'
+                        },
+                        exit: 'resetCommand'
                     },
                     request: {
-                        always: 'fetchMovableUnits'
+                        always: 'fetchMoves'
+                    },
+                    skip: {
+                        initial: 'checkIfMovesLeft',
+                        states: {
+                            checkIfMovesLeft: {
+                                always: [
+                                    {
+                                        cond: 'movesLeft',
+                                        target: 'verification'
+                                    },
+                                    {
+                                        actions: send('YES')
+                                    }
+                                ]
+                            },
+                            verification: {
+                                ...binaryPromptMachine([
+                                    (context) => `${context.moves.production ? 'You could produce a unit.' : 'You could move a unit.'} Still want to do nothing?`,
+                                    () => 'Do you want to skip this round?'
+                                ])
+                            }
+                        },
+                        on: {
+                            YES: 'final',
+                            NO: 'fetchMoves'
+                        }
                     },
                     final: {
                         type: 'final'
@@ -680,7 +761,7 @@ export const createUserEmpireMachine = (empireContext: EmpireContext, srm: Machi
                     }
 
                     if (type) {
-                        let unit = context.units.find(unit => unit.type === type);
+                        let unit = context.moves.units.find(unit => unit.type === type);
                         if (unit) {
                             return {
                                 ...context.command,
@@ -696,6 +777,7 @@ export const createUserEmpireMachine = (empireContext: EmpireContext, srm: Machi
             })
         },
         guards: {
+            movesLeft: (context) => context.moves.units.length > 0 || context.moves.production,
             validateSourceUnit: (context: UserEmpireContext) => {
                 let reqUnit = context.command.utterance.sourceUnit.toLowerCase().trim()
                 let type: units | undefined;
@@ -708,7 +790,7 @@ export const createUserEmpireMachine = (empireContext: EmpireContext, srm: Machi
                 }
 
                 if (type) {
-                    let unit = context.units.find(unit => unit.type === type);
+                    let unit = context.moves.units.find(unit => unit.type === type);
                     if (unit) {
                         return true
                     }

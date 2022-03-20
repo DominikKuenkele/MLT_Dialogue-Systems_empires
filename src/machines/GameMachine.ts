@@ -13,6 +13,7 @@ interface GameContext {
 
     speechRecognitionMachine: MachineRef,
     machinesReady: number,
+    turn: number
 }
 
 type GameEvents =
@@ -40,6 +41,7 @@ export const gameMachine = (speechRecognitionMachine: MachineRef) => createMachi
             currentEmpire: dummyRef,
             gameBoard: dummyRef,
             machinesReady: 0,
+            turn: 1,
             speechRecognitionMachine: speechRecognitionMachine
         },
         initial: 'idle',
@@ -111,24 +113,33 @@ export const gameMachine = (speechRecognitionMachine: MachineRef) => createMachi
             processingUser: {
                 entry: [
                     'moveUserToCurrent',
-                    'notifyCurrentMachineToStart'
+                    'notifyGameBoardCurrentEmpire',
+                    'notifyCurrentMachineToStart',
                 ],
                 on: {
                     EMPIRE_DONE: {
                         target: 'processingTurn',
-                        actions: 'resetCurrentEmpire'
+                        actions: [
+                            'notifyGameBoardEndTurn',
+                            'resetCurrentEmpire'
+                        ]
                     }
                 }
             },
             processingAI: {
                 entry: [
                     'moveNextAIToCurrent',
+                    'notifyGameBoardCurrentEmpire',
                     'notifyCurrentMachineToStart'
                 ],
                 on: {
                     EMPIRE_DONE: [
                         {
-                            actions: 'empireDone'
+                            actions: [
+                                'notifyGameBoardEndTurn',
+                                'empireDone',
+                                'notifyGameBoardCurrentEmpire',
+                            ]
                         },
                         {
                             cond: 'allEmpiresDone',
@@ -138,7 +149,8 @@ export const gameMachine = (speechRecognitionMachine: MachineRef) => createMachi
                 },
                 exit: [
                     'resetCurrentEmpire',
-                    'resetAI'
+                    'resetAI',
+                    'notifyGameBoardEndTurn',
                 ]
             },
             processingTurn: {
@@ -156,7 +168,11 @@ export const gameMachine = (speechRecognitionMachine: MachineRef) => createMachi
                             cond: 'oneEmpireLiving'
                         },
                         {
-                            target: 'processingUser'
+                            target: 'processingUser',
+                            actions: assign({
+                                turn: context => context.turn + 1
+                            })
+
                         }
                     ]
                 }
@@ -171,11 +187,17 @@ export const gameMachine = (speechRecognitionMachine: MachineRef) => createMachi
     },
     {
         guards: {
-            userEmpireDead: (context, event) => !event.empires.includes(context.userEmpire),
+            userEmpireDead: (context, event) => !event.empires.includes(context.userEmpire.ref.getSnapshot().context.empire),
             oneEmpireLiving: (context, event) => event.empires.length === 1,
             allEmpiresDone: context => context.aiEmpireQueue.length === 0
         },
         actions: {
+            notifyGameBoardCurrentEmpire: send((context) => ({
+                type: 'START_TURN',
+                empire: context.currentEmpire.ref.getSnapshot().context.empire,
+                turn: context.turn
+            }), {to: context => context.gameBoard.ref}),
+            notifyGameBoardEndTurn: send('END_TURN', {to: context => context.gameBoard.ref}),
             createUserEmpire: assign({
                 userEmpire: (context) => {
                     const empire = {
@@ -185,7 +207,7 @@ export const gameMachine = (speechRecognitionMachine: MachineRef) => createMachi
                     };
                     return {
                         id: empire.id,
-                        ref: spawn(createUserEmpireMachine(empire, context.speechRecognitionMachine))
+                        ref: spawn(createUserEmpireMachine(empire, context.speechRecognitionMachine), 'userEmpire')
                     };
                 }
             }),
@@ -199,7 +221,7 @@ export const gameMachine = (speechRecognitionMachine: MachineRef) => createMachi
                     };
                     list.push({
                         id: empire1.id,
-                        ref: spawn(createEmpireMachine(empire1))
+                        ref: spawn(createEmpireMachine(empire1), empires.empire1)
                     });
 
                     // const empire2 = {

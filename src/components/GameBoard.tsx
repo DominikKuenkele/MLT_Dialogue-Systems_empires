@@ -32,8 +32,8 @@ export function GameBoard(props: GameBoardProps) {
     const [gameBoardState] = useActor(props.gameBoardRef);
 
     return (
-        <div>
-            <HexGrid width="auto" height="100vh"
+        <div className={'gameBoard'}>
+            <HexGrid width="auto" height="96vh"
                      viewBox={-props.tileSize + " " + -props.tileSize + " " + gameBoardWidth + " " + gameBoardHeight}>
                 <Layout size={{x: props.tileSize, y: props.tileSize}} spacing={1.05}>
                     {hexagons.map((hex: any, i: number) => {

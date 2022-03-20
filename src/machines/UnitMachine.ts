@@ -2,7 +2,7 @@ import {assign, createMachine, sendParent} from "xstate";
 import {empires} from "../Util";
 import {units} from "../components/Unit";
 
-interface InitialUnitContext {
+export interface InitialUnitContext {
     type: units,
     maxHealth: number,
     health: number,
@@ -10,12 +10,14 @@ interface InitialUnitContext {
     effective: units[],
     ineffective: units[],
     moveRange: number,
-    attackRange: number
+    attackRange: number,
+    movable: boolean,
+    productionTime: number
 }
 
 export interface UnitContext extends InitialUnitContext {
     id: string,
-    empire: empires,
+    empire: empires
 }
 
 export const spearmanContext: InitialUnitContext = {
@@ -27,6 +29,8 @@ export const spearmanContext: InitialUnitContext = {
     ineffective: [units.Archer],
     moveRange: 2,
     attackRange: 1,
+    productionTime: 2,
+    movable: false
 }
 
 export const archerContext: InitialUnitContext = {
@@ -38,6 +42,8 @@ export const archerContext: InitialUnitContext = {
     ineffective: [units.Horseman],
     moveRange: 2,
     attackRange: 3,
+    productionTime: 2,
+    movable: false
 }
 
 export const horsemanContext: InitialUnitContext = {
@@ -49,6 +55,8 @@ export const horsemanContext: InitialUnitContext = {
     ineffective: [units.Spearman],
     moveRange: 3,
     attackRange: 1,
+    productionTime: 2,
+    movable: false
 }
 
 export const baseContext: InitialUnitContext = {
@@ -60,12 +68,17 @@ export const baseContext: InitialUnitContext = {
     ineffective: [],
     moveRange: 0,
     attackRange: 1,
+    productionTime: 0,
+    movable: false
 }
 
 export type UnitEvents =
     {
         type: 'DAMAGE',
         damage: number
+    } |
+    {
+        type: 'MOVABLE'
     }
 
 export const createUnitMachine = (initialContext: UnitContext) => createMachine<UnitContext, UnitEvents>({
@@ -73,6 +86,18 @@ export const createUnitMachine = (initialContext: UnitContext) => createMachine<
         initial: 'idle',
         context: {
             ...initialContext
+        },
+        on: {
+            MOVABLE: {
+                actions: assign({
+                    movable: true
+                })
+            },
+            NOT_MOVABLE: {
+                actions: assign({
+                    movable: false
+                })
+            },
         },
         states: {
             idle: {

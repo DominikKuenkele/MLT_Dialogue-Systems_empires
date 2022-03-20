@@ -1,9 +1,9 @@
 import {Status} from "./Status";
-import {asEffect, useInterpret, useMachine} from "@xstate/react";
+import {asEffect, useMachine} from "@xstate/react";
 import {gameMachine} from "../machines/GameMachine";
 import {assign, spawn} from "xstate";
 import uuid from "uuid-v4";
-import {createGameBoardMachine} from "../machines/GameBoardMachine";
+import {createGameBoardMachine, Producer} from "../machines/GameBoardMachine";
 import {dummyRef} from "../Util";
 import {GameBoard} from "./GameBoard";
 import createSpeechRecognitionPonyfill from "web-speech-cognitive-services/lib/SpeechServices/SpeechToText";
@@ -113,30 +113,41 @@ export function Game() {
                 createGameBoard: assign({
                     gameBoard: () => ({
                         id: uuid(),
-                        ref: spawn(createGameBoardMachine({
-                            gameBoard: createDefaultGameBoard(number_tiles_x, number_tiles_y),
-                            livingEmpires: []
-                        }))
+                        ref: spawn(createGameBoardMachine(createDefaultGameBoard(number_tiles_x, number_tiles_y)), 'gameBoard')
                     })
                 })
             }
         }
     );
 
+    const currentEmpire = gameState.context.currentEmpire.id !== '' ?
+        gameState.context.currentEmpire.ref.getSnapshot().context.empire :
+        undefined;
+    const production = () => {
+        if (gameState.context.gameBoard.id !== '' && currentEmpire !== undefined) {
+            let productions = gameState.context.gameBoard.ref.getSnapshot().context.producer
+            if (productions) {
+                let userProductions = productions.filter((prod: Producer) => prod.unit.ref.getSnapshot().context.empire === currentEmpire)
+                return userProductions.length === 0 ? undefined : userProductions[0]
+            }
+        }
+        return undefined
+    }
     const output = () => {
         switch (gameState.value) {
             case 'idle':
-                //fallthrough
+            //fallthrough
             case 'settingUp:':
                 return <div onClick={() => gameSend({type: 'START'})}>Start Game</div>
-            case 'won':
-                return <div>You have won!</div>;
-            case 'lost':
-                return <div>You have won!</div>;
             default:
                 return (
-                    <div>
-                        <Status/>
+                    <div className={'game'}>
+                        <Status gameState={gameState.value.toString()}
+                                currentEmpire={currentEmpire}
+                                turn={gameState.context.turn}
+                                userTurn={gameState.context.userEmpire === gameState.context.currentEmpire}
+                                production={production()}
+                        />
                         <GameBoard numberTilesX={number_tiles_x}
                                    numberTileY={number_tiles_y}
                                    tileSize={tile_size}

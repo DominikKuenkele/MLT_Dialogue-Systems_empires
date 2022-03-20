@@ -1,13 +1,10 @@
 import React from "react";
-import {GameBoardContext} from "./GameBoardContext";
 import {UnitProps} from "./Unit";
 
 export function Spearman(props: UnitProps) {
-    const {tile_size} = React.useContext(GameBoardContext)
-
     return (
-        <svg y={-tile_size / 2} x={-tile_size / 2} width={tile_size}
-             height={tile_size}
+        <svg y={-props.size / 2} x={-props.size / 2} width={props.size}
+             height={props.size}
              viewBox="0 0 12650 12000" className={"unit"} transform={"scale(1 -1)"}>
             <path
                 className={props.empire}
