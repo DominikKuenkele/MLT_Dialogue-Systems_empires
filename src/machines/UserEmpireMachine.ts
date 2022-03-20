@@ -12,9 +12,9 @@ import {
 } from "xstate";
 import {MachineRef} from "../Util";
 import {EmpireContext, EmpireEvents} from "./EmpireMachine";
-import {units} from "../components/Unit";
+import {getUnitByString, units} from "../components/Unit";
 
-const rasaurl = 'https://empires-kuenkele.herokuapp.com/model/parse';
+const rasaurl = 'http://localhost:5005/model/parse';
 const nluRequest = (text: string) =>
     fetch(new Request(rasaurl, {
         method: 'POST',
@@ -27,39 +27,14 @@ type rasa_response_entity = {
     start: number,
     end: number,
     value: string,
-    extractor: string
+    extractor: string,
+    role: string
 }
 
 const binaryGrammar = {
     "Yes": ["Yes.", "Of course.", "Sure.", "Yeah.", "Yes please.", "Yep.", "OK.", "Yes, thank you."],
     "No": ["No.", "Nope.", "No no.", "Don't.", "Don't do it.", "No way.", "Not at all."]
 };
-
-const unitGrammar = [
-    {
-        unit: units.Archer,
-        patterns: [
-            /archer/,
-            /bowman/
-        ]
-    },
-    {
-        unit: units.Horseman,
-        patterns: [
-            /horsem[ae]n/,
-            /knight/,
-            /rider/,
-            /cavalry/
-        ]
-    },
-    {
-        unit: units.Spearman,
-        patterns: [
-            /spear ?m[ae]n/,
-            /lance/
-        ]
-    }
-]
 
 const machineAnswers: { [index: string]: Array<string> } = {
     "CR": [
@@ -172,6 +147,9 @@ function binaryPromptMachine(prompt: ((context: UserEmpireContext) => string)[])
                 {
                     actions: send('NO'),
                     cond: (_, event) => binaryGrammar["No"].includes(event.value.utterance)
+                },
+                {
+                    target: '.nomatch'
                 }
             ],
             TIMEOUT: {
@@ -204,11 +182,21 @@ type commandType = {
     }
 }
 
+type productionCommandType = {
+    utterance: {
+        unitType: string
+    },
+    translated: {
+        unitType: units | undefined
+    }
+}
+
 export interface UserEmpireContext extends EmpireContext {
     speechRecognitionMachine: MachineRef
     recResult: Hypothesis,
     errorMessage: string,
     command: commandType,
+    productionCommand: productionCommandType,
     moves: {
         production: boolean,
         units: []
@@ -233,6 +221,7 @@ export const createUserEmpireMachine = (empireContext: EmpireContext, srm: Machi
             recResult: {} as Hypothesis,
             errorMessage: '',
             command: {} as commandType,
+            productionCommand: {} as productionCommandType,
             moves: {
                 production: false,
                 units: []
@@ -241,7 +230,6 @@ export const createUserEmpireMachine = (empireContext: EmpireContext, srm: Machi
         initial: 'settingUp',
         states: {
             settingUp: {
-                entry: assign({}),
                 initial: 'registerAtGameBoard',
                 states: {
                     registerAtGameBoard: {
@@ -253,13 +241,7 @@ export const createUserEmpireMachine = (empireContext: EmpireContext, srm: Machi
                     registerAtSRM: {
                         entry: 'registerAtSRM',
                         on: {
-                            REGISTERED: 'startSRM'
-                        }
-                    },
-                    startSRM: {
-                        entry: sendToSRM('CLICK'),
-                        on: {
-                            TTS_READY: 'final'
+                            REGISTERED: 'final'
                         }
                     },
                     final: {
@@ -270,8 +252,14 @@ export const createUserEmpireMachine = (empireContext: EmpireContext, srm: Machi
                 onDone: 'waiting'
             },
             turn: {
-                initial: 'fetchMoves',
+                initial: 'startUtterance',
                 states: {
+                    startUtterance: {
+                        entry: say(() => 'It is our turn now.'),
+                        on: {
+                            ENDSPEECH: 'fetchMoves'
+                        }
+                    },
                     fetchMoves: {
                         entry: send(context => ({
                                 type: 'GET_MOVES',
@@ -302,8 +290,15 @@ export const createUserEmpireMachine = (empireContext: EmpireContext, srm: Machi
                     },
                     getCommand: {
                         ...abstractPromptMachine([
-                            () => 'What is your move?',
-                            () => 'It is your turn.'
+                            () => 'What shall we do?',
+                            (context) => {
+                                let utterances = [];
+                                for (let unit of context.moves.units) {
+                                    utterances.push(`We could move the ${unit.type}`)
+                                }
+                                context.moves.production && utterances.push('We could train a unit.')
+                                return utterances[Math.floor(Math.random() * utterances.length)]
+                            }
                         ]),
                         on: {
                             RECOGNISED: {
@@ -339,8 +334,11 @@ export const createUserEmpireMachine = (empireContext: EmpireContext, srm: Machi
                                     target: 'produce'
                                 },
                                 {
-                                    cond: (_, event) => event.data['intent']['name'] === 'skip',
+                                    cond: (_, event) => event.data['intent']['name'] === 'skip_round',
                                     target: 'skip'
+                                },
+                                {
+                                    target: 'getCommand.nomatch'
                                 }
                             ],
                             onError: 'getCommand.hist'
@@ -383,21 +381,19 @@ export const createUserEmpireMachine = (empireContext: EmpireContext, srm: Machi
                                     src: context => nluRequest(context.recResult.utterance),
                                     onDone: [
                                         {
+                                            cond: (context, event) => event.data['intent']['name'] === 'exit_question',
+                                            target: 'final'
+                                        },
+                                        {
                                             actions: assign({
                                                 command: (context, event) => {
-                                                    // let unit: rasa_response_entity = event.data['entities'].find((element: rasa_response_entity) => element.entity === 'sourceUnit')
-                                                    // let target: rasa_response_entity = event.data['entities'].find((element: rasa_response_entity) => element.entity === 'targetField')
+                                                    let unit: rasa_response_entity = event.data['entities'].find((element: rasa_response_entity) => element.entity === 'unit' && element.role === 'source')
+                                                    let target: rasa_response_entity = event.data['entities'].find((element: rasa_response_entity) => element.entity === 'field' && element.role === 'target')
 
-                                                    // return {
-                                                    //     sourceUnit: unit && unit.value ? unit.value : context.command.sourceUnit,
-                                                    //     target: target && target.value ? target.value : context.command.target
-                                                    // }
-                                                    let pattern = /(Move the (.*?))? ?((Move it to|to) (.*?))?\./;
-                                                    let regexExec = pattern.exec(`${context.recResult.utterance}${context.recResult.utterance.endsWith('.') ? '' : '.'}`)
                                                     return {
                                                         utterance: {
-                                                            sourceUnit: (regexExec && regexExec[2]) || context.command.utterance.sourceUnit,
-                                                            target: (regexExec && regexExec[5]) || context.command.utterance.target,
+                                                            sourceUnit: unit && unit.value ? unit.value.toLowerCase() : context.command.utterance.sourceUnit,
+                                                            target: target && target.value ? target.value : context.command.utterance.target
                                                         },
                                                         translated: {
                                                             ...context.command.translated
@@ -427,7 +423,7 @@ export const createUserEmpireMachine = (empireContext: EmpireContext, srm: Machi
                                                     sourceUnit: ''
                                                 }
                                             },
-                                            errorMessage: "I couldn't find the unit. Could you specify it more?"
+                                            errorMessage: "I couldn't find the unit. Which unit did you mean?"
                                         })),
                                         target: 'errorMessage',
                                     }
@@ -469,7 +465,7 @@ export const createUserEmpireMachine = (empireContext: EmpireContext, srm: Machi
                                     },
                                     OCC_ENEMY: {
                                         target: 'final',
-                                        actions: say(() => "The enemy is already there, mlord.")
+                                        actions: say(() => "The enemy is already there, milord.")
                                     },
                                     OUT_OF_RANGE: {
                                         target: 'final',
@@ -536,14 +532,19 @@ export const createUserEmpireMachine = (empireContext: EmpireContext, srm: Machi
                                     src: context => nluRequest(context.recResult.utterance),
                                     onDone: [
                                         {
+                                            cond: (context, event) => event.data['intent']['name'] === 'exit_question',
+                                            target: 'final'
+                                        },
+                                        {
                                             actions: assign({
                                                 command: (context, event) => {
-                                                    let pattern = /(Attack (the .*? on )?(.*?))?( ?[Ww]ith the (.*?))?\./;
-                                                    let regexExec = pattern.exec(`${context.recResult.utterance}${context.recResult.utterance.endsWith('.') ? '' : '.'}`)
+                                                    let unit: rasa_response_entity = event.data['entities'].find((element: rasa_response_entity) => element.entity === 'unit' && element.role === 'source')
+                                                    let target: rasa_response_entity = event.data['entities'].find((element: rasa_response_entity) => element.entity === 'field' && element.role === 'target')
+
                                                     return {
                                                         utterance: {
-                                                            sourceUnit: (regexExec && regexExec[5]) || context.command.utterance.sourceUnit,
-                                                            target: (regexExec && regexExec[3]) || context.command.utterance.target,
+                                                            sourceUnit: unit && unit.value ? unit.value : context.command.utterance.sourceUnit,
+                                                            target: target && target.value ? target.value : context.command.utterance.target
                                                         },
                                                         translated: {
                                                             ...context.command.translated
@@ -648,22 +649,116 @@ export const createUserEmpireMachine = (empireContext: EmpireContext, srm: Machi
                         onDone: 'fetchMoves'
                     },
                     produce: {
-                        entry: [
-                            send(
-                                context => ({
-                                    type: 'PRODUCE',
-                                    unit: units.Archer
-                                }), {
-                                    to: context => context.gameBoard.ref
-                                })],
-                        on: {
-                            PROD_IN_PROGRESS: {
-                                target: 'fetchMoves',
-                                actions: say(() => "We already produce a unit")
+                        initial: 'parseUtterance',
+                        entry: 'resetProductionCommand',
+                        states: {
+                            fetchInformation: {
+                                initial: 'getUnitType',
+                                states: {
+                                    hist: {
+                                        type: 'history'
+                                    },
+                                    getUnitType: {
+                                        ...formFillingPromptMachine(
+                                            [() => 'Which unit do you want to train?'],
+                                            (context) => context.productionCommand.utterance.unitType !== '',
+                                            'final',
+                                            'produce~parseUtterance')
+                                    },
+                                    final: {
+                                        type: 'final'
+                                    }
+                                },
+                                onDone: 'translateUnitType'
                             },
-                            EXECUTED: 'fetchMoves'
+                            parseUtterance: {
+                                id: 'produce~parseUtterance',
+                                invoke: {
+                                    src: context => nluRequest(context.recResult.utterance),
+                                    onDone: [
+                                        {
+                                            cond: (context, event) => event.data['intent']['name'] === 'exit_question',
+                                            target: 'final'
+                                        },
+                                        {
+                                            actions: assign({
+                                                productionCommand: (context, event) => {
+                                                    let unit: rasa_response_entity = event.data['entities'].find((element: rasa_response_entity) => element.entity === 'unit')
+
+                                                    return {
+                                                        utterance: {
+                                                            unitType: unit && unit.value ? unit.value : context.productionCommand.utterance.unitType,
+                                                        },
+                                                        translated: {
+                                                            ...context.productionCommand.translated
+                                                        }
+                                                    }
+                                                }
+                                            }),
+                                            target: 'fetchInformation.hist'
+                                        }
+                                    ],
+                                    onError: 'fetchInformation.hist'
+                                }
+                            },
+                            translateUnitType: {
+                                always: [
+                                    {
+                                        cond: 'validateUnitType',
+                                        actions: 'translateUnitType',
+                                        target: 'executeProduction'
+                                    },
+                                    {
+                                        actions: assign(context => ({
+                                            productionCommand: {
+                                                ...context.productionCommand,
+                                                utterance: {
+                                                    unitType: ''
+                                                }
+                                            },
+                                            errorMessage: "I did not understand, who you want to train?"
+                                        })),
+                                        target: 'errorMessage',
+                                    }
+                                ]
+                            },
+                            executeProduction: {
+                                entry: [
+                                    send(context => ({
+                                        type: 'PRODUCE',
+                                        unit: context.productionCommand.translated.unitType
+                                    }), {
+                                        to: context => context.gameBoard.ref
+                                    })],
+                                on: {
+                                    PROD_IN_PROGRESS: {
+                                        target: 'final',
+                                        actions: say(() => "We already produce a unit")
+                                    },
+                                    EXECUTED: 'final'
+                                },
+                                exit: 'resetProductionCommand'
+                            },
+                            errorMessage: {
+                                ...abstractPromptMachine([(context) => context.errorMessage]),
+                                on: {
+                                    RECOGNISED: {
+                                        target: 'parseUtterance',
+                                        actions: assign({
+                                            recResult: (_c, event) => event.value
+                                        })
+                                    },
+                                    TIMEOUT: {
+                                        target: '.hist',
+                                        actions: send('REPROMPT')
+                                    }
+                                }
+                            },
+                            final: {
+                                type: 'final'
+                            }
                         },
-                        exit: 'resetCommand'
+                        onDone: 'fetchMoves',
                     },
                     request: {
                         always: 'fetchMoves'
@@ -724,6 +819,12 @@ export const createUserEmpireMachine = (empireContext: EmpireContext, srm: Machi
                     translated: {id: '', x: 0, y: 0}
                 }
             }),
+            resetProductionCommand: assign<UserEmpireContext>({
+                productionCommand: {
+                    utterance: {unitType: ''},
+                    translated: {unitType: undefined}
+                }
+            }),
             registerAtGameBoard: send((context: UserEmpireContext) => ({
                     type: 'REGISTER',
                     empire: context.empire
@@ -748,20 +849,22 @@ export const createUserEmpireMachine = (empireContext: EmpireContext, srm: Machi
                     }
                 }
             }),
-            translateSourceUnit: assign<UserEmpireContext>({
-                command: context => {
-                    let reqUnit = context.command.utterance.sourceUnit.toLowerCase().trim()
-                    let type: units | undefined;
-
-                    for (let unit of unitGrammar) {
-                        if (unit.patterns.some(pattern => pattern.test(reqUnit))) {
-                            type = unit.unit;
-                            break;
+            translateUnitType: assign<UserEmpireContext>({
+                productionCommand: (context) => {
+                    return {
+                        ...context.productionCommand,
+                        translated: {
+                            unitType: getUnitByString(context.productionCommand.utterance.unitType)!
                         }
                     }
+                }
+            }),
+            translateSourceUnit: assign<UserEmpireContext>({
+                command: context => {
+                    let unit_type: units = getUnitByString(context.command.utterance.sourceUnit)!
 
-                    if (type) {
-                        let unit = context.moves.units.find(unit => unit.type === type);
+                    if (unit_type) {
+                        let unit = context.moves.units.find(unit => unit.type === unit_type);
                         if (unit) {
                             return {
                                 ...context.command,
@@ -779,18 +882,11 @@ export const createUserEmpireMachine = (empireContext: EmpireContext, srm: Machi
         guards: {
             movesLeft: (context) => context.moves.units.length > 0 || context.moves.production,
             validateSourceUnit: (context: UserEmpireContext) => {
-                let reqUnit = context.command.utterance.sourceUnit.toLowerCase().trim()
-                let type: units | undefined;
+                let unit_type: units = getUnitByString(context.command.utterance.sourceUnit)!
 
-                for (let unit of unitGrammar) {
-                    if (unit.patterns.some(pattern => pattern.test(reqUnit))) {
-                        type = unit.unit;
-                        break;
-                    }
-                }
 
-                if (type) {
-                    let unit = context.moves.units.find(unit => unit.type === type);
+                if (unit_type) {
+                    let unit = context.moves.units.find(unit => unit.type === unit_type);
                     if (unit) {
                         return true
                     }
@@ -801,8 +897,13 @@ export const createUserEmpireMachine = (empireContext: EmpireContext, srm: Machi
                 let pattern = /([A-Z]*)(\d*)/;
                 let regexExec = pattern.exec(context.command.utterance.target)!;
                 return regexExec[1] && regexExec[2]
-            }
+            },
+            validateUnitType: (context: UserEmpireContext) => {
+                let producable = [units.Archer, units.Spearman, units.Horseman]
+                let unitType = getUnitByString(context.productionCommand.utterance.unitType)
 
+                return unitType && producable.includes(unitType)
+            }
         }
     }
 );

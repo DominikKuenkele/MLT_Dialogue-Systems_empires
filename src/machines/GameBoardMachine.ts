@@ -114,6 +114,7 @@ function getFreeNeighbour(x: number, y: number, gameBoard: GameBoardField[][]) {
             }
         }
     }
+    console.log(neighbourCoords)
 
     const isNeighbour = (coord: { q: number, r: number, s: number }) => {
         return neighbourCoords.some(neighbour =>
@@ -124,13 +125,15 @@ function getFreeNeighbour(x: number, y: number, gameBoard: GameBoardField[][]) {
 
     let freeFields = []
     for (let rowIndex in gameBoard) {
-        for (let colIndex in gameBoard) {
+        for (let colIndex in gameBoard[rowIndex]) {
             let neighbour = gameBoard[rowIndex][colIndex]
+            console.log(neighbour.hexCoordinate)
             if (isNeighbour(neighbour.hexCoordinate) && neighbour.unit.id === '') {
                 freeFields.push([parseInt(rowIndex), parseInt(colIndex)])
             }
         }
     }
+
     if (freeFields.length > 0) {
         return freeFields[Math.floor(Math.random() * freeFields.length)]
     } else {
@@ -438,7 +441,6 @@ export const createGameBoardMachine = (gameBoard: GameBoardField[][]) => createM
                         //cannot happen, since event.unit is of type units
                     }
 
-
                     const newUnit = {
                         ...initialContext!,
                         id: uuid(),
@@ -516,6 +518,18 @@ export const createGameBoardMachine = (gameBoard: GameBoardField[][]) => createM
                             temp[point.y][point.x].unit = {
                                 id: base.id,
                                 ref: spawn(createUnitMachine(base))
+                            };
+
+                            const initialUnit = {
+                                ...archerContext,
+                                id: uuid(),
+                                empire: event.empire
+                            }
+                            let [spawnY, spawnX] = getFreeNeighbour(point.x, point.y, context.gameBoard)
+                            console.log(spawnX,  spawnY)
+                            temp[spawnY][spawnX].unit = {
+                                id: initialUnit.id,
+                                ref: spawn(createUnitMachine(initialUnit))
                             };
                             return temp;
                         }

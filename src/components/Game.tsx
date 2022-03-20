@@ -142,10 +142,7 @@ export function Game() {
             default:
                 return (
                     <div className={'game'}>
-                        <Status gameState={gameState.value.toString()}
-                                currentEmpire={currentEmpire}
-                                turn={gameState.context.turn}
-                                userTurn={gameState.context.userEmpire === gameState.context.currentEmpire}
+                        <Status turn={gameState.context.turn}
                                 production={production()}
                         />
                         <GameBoard numberTilesX={number_tiles_x}

@@ -10,8 +10,20 @@ export enum units {
 
 
 export function getUnitByString(name: string): units | undefined {
-    let index = Object.values(units).indexOf(name)
-    return index === -1 ? undefined : Object.keys(units)[index]
+    switch(name) {
+        case 'archer':
+            return units.Archer
+        case 'horseman':
+            return units.Horseman
+        case 'spearman':
+            return units.Spearman
+        case 'worker':
+            return units.Worker
+        case 'base':
+            return units.Base
+        default:
+            return undefined
+    }
 }
 
 

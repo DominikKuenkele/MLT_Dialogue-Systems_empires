@@ -14,10 +14,6 @@ function getGameBoardDimensions(numberTilesX: number, numberTilesY: number, tile
     return [width, height]
 }
 
-// function convertToHexgrid(field: { x: string, y: number }) {
-//     return field.y - 1 + (parseInt(field.x, 36) - 10) * hexagon_number_y
-// }
-
 interface GameBoardProps {
     numberTilesX: number,
     numberTileY: number,
