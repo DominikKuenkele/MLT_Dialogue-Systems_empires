@@ -7,7 +7,7 @@ import {createGameBoardMachine, Producer} from "../machines/GameBoardMachine";
 import {dummyRef} from "../Util";
 import {GameBoard} from "./GameBoard";
 import createSpeechRecognitionPonyfill from "web-speech-cognitive-services/lib/SpeechServices/SpeechToText";
-import {createSpeechRecognitionMachine, SRMContext} from "../machines/SpeechRecognitionMachine";
+import {createSpeechRecognitionMachine, SRMContext, SRMEvents} from "../machines/SpeechRecognitionMachine";
 
 
 const createDefaultGameBoard = (x: number, y: number) => {
@@ -123,11 +123,16 @@ export function Game() {
     const currentEmpire = gameState.context.currentEmpire.id !== '' ?
         gameState.context.currentEmpire.ref.getSnapshot().context.empire :
         undefined;
+    const userEmpire = gameState.context.userEmpire.id !== '' ?
+        gameState.context.userEmpire.ref.getSnapshot().context.empire :
+        undefined;
     const production = () => {
         if (gameState.context.gameBoard.id !== '' && currentEmpire !== undefined) {
             let productions = gameState.context.gameBoard.ref.getSnapshot().context.producer
             if (productions) {
-                let userProductions = productions.filter((prod: Producer) => prod.unit.ref.getSnapshot().context.empire === currentEmpire)
+                let userProductions = productions.filter(
+                    (prod: Producer) => prod.unit.ref.getSnapshot().context.empire === userEmpire
+                )
                 return userProductions.length === 0 ? undefined : userProductions[0]
             }
         }

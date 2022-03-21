@@ -42,7 +42,7 @@ export const archerContext: InitialUnitContext = {
     ineffective: [units.Horseman],
     moveRange: 2,
     attackRange: 3,
-    productionTime: 2,
+    productionTime: 3,
     movable: false
 }
 
@@ -61,8 +61,8 @@ export const horsemanContext: InitialUnitContext = {
 
 export const baseContext: InitialUnitContext = {
     type: units.Base,
-    maxHealth: 20,
-    health: 20,
+    maxHealth: 250,
+    health: 250,
     attack: 40,
     effective: [],
     ineffective: [],
@@ -72,11 +72,14 @@ export const baseContext: InitialUnitContext = {
     movable: false
 }
 
-export type UnitEvents =
+type DamageEvent =
     {
         type: 'DAMAGE',
         damage: number
-    } |
+    };
+
+export type UnitEvents =
+    DamageEvent |
     {
         type: 'MOVABLE'
     }
@@ -107,7 +110,7 @@ export const createUnitMachine = (initialContext: UnitContext) => createMachine<
             },
             inAction: {
                 entry: assign({
-                    health: (context, event) => event.damage < context.health ? context.health -= event.damage : 0
+                    health: (context, event: DamageEvent) => event.damage < context.health ? context.health -= event.damage : 0
                 }),
                 always: [
                     {
@@ -133,6 +136,6 @@ export const createUnitMachine = (initialContext: UnitContext) => createMachine<
     },
     {
         guards: {
-            isDead: context => context.health <= 0
+            isDead: (context: UnitContext) => context.health <= 0
         }
     });

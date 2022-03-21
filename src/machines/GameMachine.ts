@@ -27,7 +27,14 @@ interface GameContext {
     turn: number
 }
 
+type LivingEmpireEvent =
+    {
+        type: 'SEND_LIVING_EMPIRES',
+        empires: empires[]
+    };
+
 type GameEvents =
+    LivingEmpireEvent |
     {
         type: 'START'
     } |
@@ -36,10 +43,6 @@ type GameEvents =
     } |
     {
         type: 'EMPIRE_READY'
-    } |
-    {
-        type: 'SEND_LIVING_EMPIRES',
-        empires: empires[]
     } |
     {
         type: 'ENDSPEECH'
@@ -147,7 +150,7 @@ export const gameMachine = (speechRecognitionMachine: MachineRef) => createMachi
                 ],
                 on: {
                     EMPIRE_DONE: {
-                        target: 'processingTurn',
+                        target: 'processingAI',
                         actions: [
                             'notifyGameBoardEndTurn',
                             'resetCurrentEmpire'
@@ -156,31 +159,45 @@ export const gameMachine = (speechRecognitionMachine: MachineRef) => createMachi
                 }
             },
             processingAI: {
-                entry: [
-                    'moveNextAIToCurrent',
-                    'notifyGameBoardCurrentEmpire',
-                    'notifyCurrentMachineToStart'
-                ],
-                on: {
-                    EMPIRE_DONE: [
-                        {
-                            actions: [
-                                'notifyGameBoardEndTurn',
-                                'empireDone',
-                                'notifyGameBoardCurrentEmpire',
-                            ]
-                        },
-                        {
-                            cond: 'allEmpiresDone',
-                            target: 'processingTurn'
+                initial: 'checkRemainingEmpires',
+                states: {
+                    checkRemainingEmpires: {
+                        always: [
+                            {
+                                cond: 'empiresInQueue',
+                                target: 'empireTurn'
+                            },
+                            {
+                                target: 'final'
+                            }
+                        ]
+                    },
+                    empireTurn: {
+                        entry: [
+                            'moveNextAIToCurrent',
+                            'notifyGameBoardCurrentEmpire',
+                            'notifyCurrentMachineToStart'
+                        ],
+                        on: {
+                            EMPIRE_DONE: {
+                                actions: [
+                                    'notifyGameBoardEndTurn',
+                                    'empireDone',
+                                    'resetCurrentEmpire',
+                                ],
+                                target: 'checkRemainingEmpires'
+                            }
                         }
-                    ]
+                    },
+                    final: {
+                        entry: [
+                            'resetCurrentEmpire',
+                            'resetAI',
+                        ],
+                        type: 'final'
+                    }
                 },
-                exit: [
-                    'resetCurrentEmpire',
-                    'resetAI',
-                    'notifyGameBoardEndTurn',
-                ]
+                onDone: 'processingTurn'
             },
             processingTurn: {
                 entry: send('REQ_LIVING_EMPIRES', {
@@ -199,7 +216,9 @@ export const gameMachine = (speechRecognitionMachine: MachineRef) => createMachi
                         {
                             target: 'processingUser',
                             actions: assign({
-                                turn: context => context.turn + 1
+                                turn: context => context.turn + 1,
+                                aiEmpireQueue: (context, event) =>
+                                    context.aiEmpireQueue.filter((emp) => event.empires.includes(emp.ref.getSnapshot().context.empire))
                             })
 
                         }
@@ -218,9 +237,11 @@ export const gameMachine = (speechRecognitionMachine: MachineRef) => createMachi
     },
     {
         guards: {
-            userEmpireDead: (context, event) => !event.empires.includes(context.userEmpire.ref.getSnapshot().context.empire),
-            oneEmpireLiving: (context, event) => event.empires.length === 1,
-            allEmpiresDone: context => context.aiEmpireQueue.length === 0
+            userEmpireDead: (context: GameContext, event: LivingEmpireEvent) => !event.empires.includes(context.userEmpire.ref.getSnapshot().context.empire),
+            oneEmpireLiving: (context, event: LivingEmpireEvent) => event.empires.length === 1,
+            empiresInQueue: context => {
+                return context.aiEmpireQueue.length > 0
+            }
         },
         actions: {
             notifyGameBoardCurrentEmpire: send((context) => ({
@@ -288,7 +309,7 @@ export const gameMachine = (speechRecognitionMachine: MachineRef) => createMachi
             moveUserToCurrent: assign({
                 currentEmpire: (context) => context.userEmpire
             }),
-            moveNextAIToCurrent: assign({
+            moveNextAIToCurrent: assign<GameContext, GameEvents>({
                 currentEmpire: (context) => context.aiEmpireQueue[0],
                 aiEmpireQueue: (context) => {
                     let temp = context.aiEmpireQueue;
@@ -296,12 +317,12 @@ export const gameMachine = (speechRecognitionMachine: MachineRef) => createMachi
                     return temp;
                 }
             }),
-            resetAI: assign({
+            resetAI: assign<GameContext, GameEvents>({
                 aiEmpireQueue: (context) => context.aiEmpirePile,
-                aiEmpirePile: [] as MachineRef[]
+                aiEmpirePile: () => [] as MachineRef[]
             }),
-            resetCurrentEmpire: assign({
-                currentEmpire: dummyRef
+            resetCurrentEmpire: assign<GameContext, GameEvents>({
+                currentEmpire: () => dummyRef
             }),
             notifyCurrentMachineToStart: send(
                 {type: 'TURN'},
