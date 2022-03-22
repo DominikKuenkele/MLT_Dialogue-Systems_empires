@@ -84,7 +84,7 @@ export function getPrompts(prompt: ((context: UserEmpireContext) => string)[]): 
     return state;
 }
 
-export function formFillingPromptMachine(prompt: [(context: UserEmpireContext) => string],
+export function formFillingPromptMachine(prompt: ((context: UserEmpireContext) => string)[],
                                          condition: (context: UserEmpireContext) => boolean,
                                          target: string,
                                          parserId: string): MachineConfig<UserEmpireContext, any, UserEmpireEvents> {

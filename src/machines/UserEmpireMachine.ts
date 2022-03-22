@@ -201,8 +201,14 @@ export const createUserEmpireMachine = (empireContext: initialEmpireContext, srm
                         states: {
                             ...motionStateNode(
                                 'move',
-                                [() => 'Which unit should move?'],
-                                [() => 'Where do you want to move it?'],
+                                [
+                                    () => 'Which unit should move?',
+                                    () => 'Who should move?'
+                                ],
+                                [
+                                    () => 'Where do you want to move it?',
+                                    () => 'What is the target?'
+                                ],
                                 "I am not sure, who should move.",
                                 "I couldn't find the field. Could you repeat it?"
                             ),
@@ -293,7 +299,10 @@ export const createUserEmpireMachine = (empireContext: initialEmpireContext, srm
                                     },
                                     getUnitType: {
                                         ...formFillingPromptMachine(
-                                            [() => 'Which unit do you want to train?'],
+                                            [
+                                                () => 'Which unit do you want to train?',
+                                                () => 'Which unit?'
+                                            ],
                                             (context) => context.commandTranslator.utterance.unitType !== '',
                                             'final',
                                             'produce~parseUtterance')
@@ -420,7 +429,10 @@ export const createUserEmpireMachine = (empireContext: initialEmpireContext, srm
                                     },
                                     getSourceUnit: {
                                         ...formFillingPromptMachine(
-                                            [() => 'Which unit do you mean?'],
+                                            [
+                                                () => 'Which unit do you mean?',
+                                                () => 'What is the unit?'
+                                            ],
                                             (context) => context.commandTranslator.utterance.sourceUnit !== '',
                                             'final',
                                             `req_move~parseUtterance`)
@@ -593,7 +605,7 @@ export const createUserEmpireMachine = (empireContext: initialEmpireContext, srm
                                                     unitType: ''
                                                 }
                                             },
-                                            errorMessage: "Which unit you mean?"
+                                            errorMessage: "Which unit do you mean?"
                                         })),
                                         target: 'errorMessage',
                                     }
@@ -848,7 +860,7 @@ export const createUserEmpireMachine = (empireContext: initialEmpireContext, srm
             movesLeft: (context) => context.moves.units.length > 0 || context.moves.production,
             validateSourceUnit: (context: UserEmpireContext) => {
                 let unit_type: units = getUnitByString(context.commandTranslator.utterance.sourceUnit)!
-                
+
                 if (unit_type) {
                     let unit = context.moves.units.find((unit) => unit.type === unit_type);
                     if (unit) {
@@ -875,8 +887,8 @@ export const createUserEmpireMachine = (empireContext: initialEmpireContext, srm
 
 
 function motionStateNode(id: string,
-                         sourceUnitPrompt: [(context: UserEmpireContext) => string],
-                         targetPrompt: [(context: UserEmpireContext) => string],
+                         sourceUnitPrompt: ((context: UserEmpireContext) => string)[],
+                         targetPrompt: ((context: UserEmpireContext) => string)[],
                          sourceError: string,
                          targetError: string): StatesConfig<UserEmpireContext, any, UserEmpireEvents> {
     return {

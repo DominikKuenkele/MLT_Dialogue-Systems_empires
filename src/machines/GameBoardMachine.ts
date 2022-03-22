@@ -269,14 +269,26 @@ export const createGameBoardMachine = (gameBoard: GameBoardField[][]) => createM
                                     id: newUnit3.id,
                                     ref: spawn(createUnitMachine(newUnit3))
                                 };
-                                const base = {
-                                    ...baseContext,
+
+
+                                const newUnit7 = {
+                                    ...horsemanContext,
                                     id: uuid(),
                                     empire: empires.empire1
                                 }
-                                temp[2][5].unit = {
-                                    id: newUnit3.id,
-                                    ref: spawn(createUnitMachine(base))
+                                temp[11][3].unit = {
+                                    id: newUnit7.id,
+                                    ref: spawn(createUnitMachine(newUnit5))
+                                };
+
+                                const newUnit8 = {
+                                    ...horsemanContext,
+                                    id: uuid(),
+                                    empire: empires.empire3
+                                }
+                                temp[8][6].unit = {
+                                    id: newUnit7.id,
+                                    ref: spawn(createUnitMachine(newUnit5))
                                 };
                                 return temp;
                             }
