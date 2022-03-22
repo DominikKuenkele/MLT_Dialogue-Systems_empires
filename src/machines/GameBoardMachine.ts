@@ -276,9 +276,9 @@ export const createGameBoardMachine = (gameBoard: GameBoardField[][]) => createM
                                     id: uuid(),
                                     empire: empires.empire1
                                 }
-                                temp[11][3].unit = {
+                                temp[3][11].unit = {
                                     id: newUnit7.id,
-                                    ref: spawn(createUnitMachine(newUnit5))
+                                    ref: spawn(createUnitMachine(newUnit7))
                                 };
 
                                 const newUnit8 = {
@@ -286,9 +286,9 @@ export const createGameBoardMachine = (gameBoard: GameBoardField[][]) => createM
                                     id: uuid(),
                                     empire: empires.empire3
                                 }
-                                temp[8][6].unit = {
-                                    id: newUnit7.id,
-                                    ref: spawn(createUnitMachine(newUnit5))
+                                temp[6][8].unit = {
+                                    id: newUnit8.id,
+                                    ref: spawn(createUnitMachine(newUnit8))
                                 };
                                 return temp;
                             }
