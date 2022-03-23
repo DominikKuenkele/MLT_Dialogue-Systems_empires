@@ -1,7 +1,7 @@
 import {Action, assign, Event, EventObject, MachineConfig, send, SendExpr, StatesConfig} from "xstate";
 import {UserEmpireContext, UserEmpireEvents} from "./machines/UserEmpireMachine";
 
-const rasaurl = 'http://localhost:5005/model/parse';
+const rasaurl = process.env.REACT_APP_RASA_SERVER!;
 export const nluRequest = (text: string) =>
     fetch(new Request(rasaurl, {
         method: 'POST',
