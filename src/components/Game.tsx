@@ -143,7 +143,7 @@ export function Game() {
             case 'idle':
             //fallthrough
             case 'settingUp:':
-                return <div onClick={() => gameSend({type: 'START'})}>Start Game</div>
+                return <div className={'start-button'} onClick={() => gameSend({type: 'START'})}>Start Game</div>
             default:
                 return (
                     <div className={'game'}>
