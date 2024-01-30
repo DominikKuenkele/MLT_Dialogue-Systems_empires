@@ -1,13 +1,11 @@
-import {Actions, actions, assign, createMachine, forwardTo} from "xstate";
-import createSpeechSynthesisPonyfill from 'web-speech-cognitive-services/lib/SpeechServices/TextToSpeech';
-import {MachineRef} from "../Util";
 import uuid from "uuid-v4";
-import {pure, respond} from "xstate/es/actions";
-import {units} from "../components/Unit";
-import {GameBoardContext} from "./GameBoardMachine";
+import createSpeechSynthesisPonyfill from 'web-speech-cognitive-services/lib/SpeechServices/TextToSpeech';
+import { Actions, actions, assign, createMachine, forwardTo } from "xstate";
+import { pure, respond } from "xstate/es/actions";
+import { MachineRef } from "../Util";
 
 
-const {send, cancel} = actions;
+const { send, cancel } = actions;
 
 const TOKEN_ENDPOINT = 'https://northeurope.api.cognitive.microsoft.com/sts/v1.0/issuetoken';
 const REGION = 'northeurope';
@@ -89,7 +87,7 @@ export const createSpeechRecognitionMachine = createMachine<SRMContext, SRMEvent
                                 new ((window as any).AudioContext || (window as any).webkitAudioContext)()
                         }),
                         (context) =>
-                            navigator.mediaDevices.getUserMedia({audio: true})
+                            navigator.mediaDevices.getUserMedia({ audio: true })
                                 .then(function (stream) {
                                     context.audioCtx.createMediaStreamSource(stream)
                                 })
@@ -103,7 +101,7 @@ export const createSpeechRecognitionMachine = createMachine<SRMContext, SRMEvent
                         onDone: {
                             actions: [
                                 assign((_context, event) => {
-                                    return {azureAuthorizationToken: event.data}
+                                    return { azureAuthorizationToken: event.data }
                                 }),
                                 'ponyfillASR'],
                             target: 'ponyfillTTS'
@@ -124,7 +122,7 @@ export const createSpeechRecognitionMachine = createMachine<SRMContext, SRMEvent
                                     authorizationToken: context.azureAuthorizationToken,
                                 }
                             });
-                            const {speechSynthesis, SpeechSynthesisUtterance} = ponyfill;
+                            const { speechSynthesis, SpeechSynthesisUtterance } = ponyfill;
                             context.tts = speechSynthesis
                             context.ttsUtterance = SpeechSynthesisUtterance
                             context.tts.addEventListener('voiceschanged', () => {
@@ -159,7 +157,7 @@ export const createSpeechRecognitionMachine = createMachine<SRMContext, SRMEvent
                         SPEAK: {
                             target: 'speaking',
                             actions: assign((_context, event) => {
-                                return {ttsAgenda: event.value}
+                                return { ttsAgenda: event.value }
                             })
                         }
                     },
@@ -190,7 +188,7 @@ export const createSpeechRecognitionMachine = createMachine<SRMContext, SRMEvent
                             entry: [
                                 'recStart',
                                 send(
-                                    {type: 'TIMEOUT'},
+                                    { type: 'TIMEOUT' },
                                     {
                                         delay: (context) => (1000 * (context.tdmPassivity || defaultPassivity)),
                                         id: 'timeout'
@@ -211,7 +209,7 @@ export const createSpeechRecognitionMachine = createMachine<SRMContext, SRMEvent
                         },
                         pause: {
                             entry: 'recStop',
-                            on: {CLICK: 'noinput'}
+                            on: { CLICK: 'noinput' }
                         }
                     }
                 },
@@ -223,7 +221,7 @@ export const createSpeechRecognitionMachine = createMachine<SRMContext, SRMEvent
                             actions: 'forwardToListeners'
                         },
                         SELECT: 'idle',
-                        CLICK: {target: 'idle', actions: send('ENDSPEECH')}
+                        CLICK: { target: 'idle', actions: send('ENDSPEECH') }
                     },
                     exit: 'ttsStop',
                 },
@@ -253,7 +251,7 @@ export const createSpeechRecognitionMachine = createMachine<SRMContext, SRMEvent
             return actions;
         }),
         registerListeners: assign({
-            listeners: (context, _e, {_event}) => [
+            listeners: (context, _e, { _event }) => [
                 ...context.listeners,
                 {
                     id: uuid(),
