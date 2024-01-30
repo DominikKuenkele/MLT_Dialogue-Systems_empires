@@ -1,19 +1,18 @@
-import {Actions, assign, createMachine, send, spawn} from "xstate";
 import uuid from "uuid-v4";
+import { Actions, assign, createMachine, send, spawn } from "xstate";
+import { pure, respond } from "xstate/es/actions";
+import { MachineRef, dummyRef, empires, hexCoord, isInHexCoordArray, location } from "../Util";
+import { units } from "../components/Unit";
+import { moveType } from "./EmpireMachine";
 import {
+    InitialUnitContext,
+    UnitContext,
     archerContext,
     baseContext,
     createUnitMachine,
     horsemanContext,
-    InitialUnitContext,
-    spearmanContext,
-    UnitContext
+    spearmanContext
 } from "./UnitMachine";
-import {dummyRef, empires, hexCoord, isInHexCoordArray, location, MachineRef} from "../Util";
-import {pure, respond} from "xstate/es/actions";
-import {units} from "../components/Unit";
-import {GameBoardContext} from "../components/GameBoardContext";
-import {moveType} from "./EmpireMachine";
 
 export type GameBoardField = {
     hexCoordinate: hexCoord,
@@ -115,7 +114,7 @@ function getBaseLocation(empire: empires, gameBoard: GameBoardField[][]) {
             }
 
             let unitContext = unit.ref.getSnapshot().context;
-            if (unitContext.empire == empire && unitContext.type === units.Base) {
+            if (unitContext.empire === empire && unitContext.type === units.Base) {
                 return [parseInt(rowIndex), parseInt(colIndex)];
             }
         }
@@ -209,284 +208,284 @@ function getDistance(location1: location, location2: location, gameBoard: GameBo
 }
 
 export const createGameBoardMachine = (gameBoard: GameBoardField[][]) => createMachine<GameBoardContext, GameBoardEvents>({
-        id: 'gameBoard',
-        context: {
-            gameBoard: gameBoard,
-            currentEmpire: undefined,
-            livingEmpires: [],
-            currentTurn: 0,
-            producer: [] as Producer[]
-        },
-        initial: 'settingUp',
-        states: {
-            settingUp: {
-                entry: [
-                    assign({
-                            gameBoard: (context) => {
-                                const temp = context.gameBoard;
-                                const newUnit1 = {
-                                    ...spearmanContext,
-                                    id: uuid(),
-                                    empire: empires.empire1
-                                }
-                                temp[0][5].unit = {
-                                    id: newUnit1.id,
-                                    ref: spawn(createUnitMachine(newUnit1))
-                                };
-                                const newUnit2 = {
-                                    ...archerContext,
-                                    id: uuid(),
-                                    empire: empires.empire4
-                                }
-                                temp[4][5].unit = {
-                                    id: newUnit2.id,
-                                    ref: spawn(createUnitMachine(newUnit2))
-                                };
-                                const newUnit5 = {
-                                    ...horsemanContext,
-                                    id: uuid(),
-                                    empire: empires.empire4
-                                }
-                                temp[6][7].unit = {
-                                    id: newUnit5.id,
-                                    ref: spawn(createUnitMachine(newUnit5))
-                                };
-                                const newUnit6 = {
-                                    ...spearmanContext,
-                                    id: uuid(),
-                                    empire: empires.empire4
-                                }
-                                temp[2][6].unit = {
-                                    id: newUnit6.id,
-                                    ref: spawn(createUnitMachine(newUnit6))
-                                };
-                                const newUnit3 = {
-                                    ...spearmanContext,
-                                    id: uuid(),
-                                    empire: empires.empire2
-                                }
-                                temp[1][5].unit = {
-                                    id: newUnit3.id,
-                                    ref: spawn(createUnitMachine(newUnit3))
-                                };
-
-
-                                const newUnit7 = {
-                                    ...horsemanContext,
-                                    id: uuid(),
-                                    empire: empires.empire1
-                                }
-                                temp[3][11].unit = {
-                                    id: newUnit7.id,
-                                    ref: spawn(createUnitMachine(newUnit7))
-                                };
-
-                                const newUnit8 = {
-                                    ...horsemanContext,
-                                    id: uuid(),
-                                    empire: empires.empire3
-                                }
-                                temp[6][8].unit = {
-                                    id: newUnit8.id,
-                                    ref: spawn(createUnitMachine(newUnit8))
-                                };
-                                return temp;
-                            }
-                        },
-                    ),
-                ],
-                on: {
-                    REGISTER: [
-                        {
-                            actions: [
-                                'spawnEmpire',
-                                respond({type: 'REGISTERED'})
-                            ]
+    id: 'gameBoard',
+    context: {
+        gameBoard: gameBoard,
+        currentEmpire: undefined,
+        livingEmpires: [],
+        currentTurn: 0,
+        producer: [] as Producer[]
+    },
+    initial: 'settingUp',
+    states: {
+        settingUp: {
+            entry: [
+                assign({
+                    gameBoard: (context) => {
+                        const temp = context.gameBoard;
+                        const newUnit1 = {
+                            ...spearmanContext,
+                            id: uuid(),
+                            empire: empires.empire1
                         }
-                    ],
-                    START_GAME: 'waitingForTurn'
-                }
+                        temp[0][5].unit = {
+                            id: newUnit1.id,
+                            ref: spawn(createUnitMachine(newUnit1))
+                        };
+                        const newUnit2 = {
+                            ...archerContext,
+                            id: uuid(),
+                            empire: empires.empire4
+                        }
+                        temp[4][5].unit = {
+                            id: newUnit2.id,
+                            ref: spawn(createUnitMachine(newUnit2))
+                        };
+                        const newUnit5 = {
+                            ...horsemanContext,
+                            id: uuid(),
+                            empire: empires.empire4
+                        }
+                        temp[6][7].unit = {
+                            id: newUnit5.id,
+                            ref: spawn(createUnitMachine(newUnit5))
+                        };
+                        const newUnit6 = {
+                            ...spearmanContext,
+                            id: uuid(),
+                            empire: empires.empire4
+                        }
+                        temp[2][6].unit = {
+                            id: newUnit6.id,
+                            ref: spawn(createUnitMachine(newUnit6))
+                        };
+                        const newUnit3 = {
+                            ...spearmanContext,
+                            id: uuid(),
+                            empire: empires.empire2
+                        }
+                        temp[1][5].unit = {
+                            id: newUnit3.id,
+                            ref: spawn(createUnitMachine(newUnit3))
+                        };
 
-            },
-            waitingForTurn: {
-                on: {
-                    START_TURN: {
-                        target: 'turn',
-                        actions: assign({
-                            currentEmpire: (_, event) => event.empire,
-                            currentTurn: (_, event) => event.turn
-                        })
-                    },
-                    REQ_LIVING_EMPIRES: {
-                        actions: respond((context: GameBoardContext) => ({
-                            type: 'SEND_LIVING_EMPIRES',
-                            empires: context.livingEmpires
-                        }))
-                    }
-                }
-            },
-            turn: {
-                type: 'parallel',
-                entry: [
-                    'checkProducer',
-                    'makeUnitsMovable'
-                ],
-                on: {
-                    END_TURN: {
-                        target: 'waitingForTurn',
-                        actions: [
-                            assign({
-                                currentEmpire: undefined
-                            })
-                        ]
+
+                        const newUnit7 = {
+                            ...horsemanContext,
+                            id: uuid(),
+                            empire: empires.empire1
+                        }
+                        temp[3][11].unit = {
+                            id: newUnit7.id,
+                            ref: spawn(createUnitMachine(newUnit7))
+                        };
+
+                        const newUnit8 = {
+                            ...horsemanContext,
+                            id: uuid(),
+                            empire: empires.empire3
+                        }
+                        temp[6][8].unit = {
+                            id: newUnit8.id,
+                            ref: spawn(createUnitMachine(newUnit8))
+                        };
+                        return temp;
                     }
                 },
-                states: {
-                    handlingEvents: {
-                        on: {
-                            MOVE: [
-                                {
-                                    cond: 'unitExistsNot',
-                                    actions: respond('EXISTS_NOT')
-                                },
-                                {
-                                    cond: 'outOfRange',
-                                    actions: respond('OUT_OF_RANGE')
-                                },
-                                {
-                                    cond: 'targetOccupiedByEnemy',
-                                    actions: respond('OCC_ENEMY')
-                                },
-                                {
-                                    cond: 'targetOccupiedByAlly',
-                                    actions: respond('OCC_ALLY')
-                                },
-                                {
-                                    actions: [
-                                        send('NOT_MOVABLE', {
-                                            to: (context: GameBoardContext, event: UnitEvents) => {
-                                                let unit = getUnit(event.id, context.gameBoard)
-                                                return unit.ref
-                                            }
-                                        }),
-                                        'applyMove',
-                                        respond('EXECUTED')
-                                    ]
-                                }
-                            ],
-                            ATTACK: [
-                                {
-                                    cond: 'unitExistsNot',
-                                    actions: respond('EXISTS_NOT')
-                                },
-                                {
-                                    cond: 'targetNotOnMap',
-                                    actions: respond('OUT_OF_RANGE')
-                                },
-                                {
-                                    cond: 'targetNotOccupied',
-                                    actions: respond('OCC_NOT')
-                                },
-                                {
-                                    cond: 'targetOccupiedByAlly',
-                                    actions: respond('OCC_ALLY')
-                                },
-                                {
-                                    cond: 'outOfRange',
-                                    actions: respond('OUT_OF_RANGE')
-                                },
-                                {
-                                    actions: [
-                                        send('NOT_MOVABLE', {
-                                            to: (context: GameBoardContext, event: UnitEvents) => {
-                                                let unit = getUnit(event.id, context.gameBoard)
-                                                return unit.ref
-                                            }
-                                        }),
-                                        'applyAttackDamage',
-                                        'applyReceivedDamage',
-                                        respond('EXECUTED')
-                                    ]
-                                }
-                            ],
-                            PRODUCE: [
-                                {
-                                    cond: 'alreadyProducing',
-                                    actions: respond('PROD_IN_PROGRESS')
-                                },
-                                {
-                                    actions: [
-                                        'produceUnit',
-                                        respond('EXECUTED')
-                                    ]
-                                }
-                            ],
-                            GET_MOVES: {
-                                actions: 'getMoves'
-                            },
-                            REQ_TURN: {
-                                actions: respond(context => ({
-                                        type: 'RES_TURN',
-                                        turn: context.currentTurn
-                                    })
-                                )
-                            },
-                            REQ_MOVES_FOR_UNIT: {
-                                actions: respond((context, event: UnitMoveEvents) => {
-                                    let unit = getUnit(event.id, context.gameBoard).ref.getSnapshot().context
-                                    let [unitY, unitX] = getUnitLocation(event.id, context.gameBoard)
+                ),
+            ],
+            on: {
+                REGISTER: [
+                    {
+                        actions: [
+                            'spawnEmpire',
+                            respond({ type: 'REGISTERED' })
+                        ]
+                    }
+                ],
+                START_GAME: 'waitingForTurn'
+            }
 
-                                    let attackableFields = getAllNeighbours(unitX, unitY, unit.attackRange, context.gameBoard)
-                                    let movableFields = getAllNeighbours(unitX, unitY, unit.moveRange, context.gameBoard)
+        },
+        waitingForTurn: {
+            on: {
+                START_TURN: {
+                    target: 'turn',
+                    actions: assign({
+                        currentEmpire: (_, event) => event.empire,
+                        currentTurn: (_, event) => event.turn
+                    })
+                },
+                REQ_LIVING_EMPIRES: {
+                    actions: respond((context: GameBoardContext) => ({
+                        type: 'SEND_LIVING_EMPIRES',
+                        empires: context.livingEmpires
+                    }))
+                }
+            }
+        },
+        turn: {
+            type: 'parallel',
+            entry: [
+                'checkProducer',
+                'makeUnitsMovable'
+            ],
+            on: {
+                END_TURN: {
+                    target: 'waitingForTurn',
+                    actions: [
+                        assign({
+                            currentEmpire: undefined
+                        })
+                    ]
+                }
+            },
+            states: {
+                handlingEvents: {
+                    on: {
+                        MOVE: [
+                            {
+                                cond: 'unitExistsNot',
+                                actions: respond('EXISTS_NOT')
+                            },
+                            {
+                                cond: 'outOfRange',
+                                actions: respond('OUT_OF_RANGE')
+                            },
+                            {
+                                cond: 'targetOccupiedByEnemy',
+                                actions: respond('OCC_ENEMY')
+                            },
+                            {
+                                cond: 'targetOccupiedByAlly',
+                                actions: respond('OCC_ALLY')
+                            },
+                            {
+                                actions: [
+                                    send('NOT_MOVABLE', {
+                                        to: (context: GameBoardContext, event: UnitEvents) => {
+                                            let unit = getUnit(event.id, context.gameBoard)
+                                            return unit.ref
+                                        }
+                                    }),
+                                    'applyMove',
+                                    respond('EXECUTED')
+                                ]
+                            }
+                        ],
+                        ATTACK: [
+                            {
+                                cond: 'unitExistsNot',
+                                actions: respond('EXISTS_NOT')
+                            },
+                            {
+                                cond: 'targetNotOnMap',
+                                actions: respond('OUT_OF_RANGE')
+                            },
+                            {
+                                cond: 'targetNotOccupied',
+                                actions: respond('OCC_NOT')
+                            },
+                            {
+                                cond: 'targetOccupiedByAlly',
+                                actions: respond('OCC_ALLY')
+                            },
+                            {
+                                cond: 'outOfRange',
+                                actions: respond('OUT_OF_RANGE')
+                            },
+                            {
+                                actions: [
+                                    send('NOT_MOVABLE', {
+                                        to: (context: GameBoardContext, event: UnitEvents) => {
+                                            let unit = getUnit(event.id, context.gameBoard)
+                                            return unit.ref
+                                        }
+                                    }),
+                                    'applyAttackDamage',
+                                    'applyReceivedDamage',
+                                    respond('EXECUTED')
+                                ]
+                            }
+                        ],
+                        PRODUCE: [
+                            {
+                                cond: 'alreadyProducing',
+                                actions: respond('PROD_IN_PROGRESS')
+                            },
+                            {
+                                actions: [
+                                    'produceUnit',
+                                    respond('EXECUTED')
+                                ]
+                            }
+                        ],
+                        GET_MOVES: {
+                            actions: 'getMoves'
+                        },
+                        REQ_TURN: {
+                            actions: respond(context => ({
+                                type: 'RES_TURN',
+                                turn: context.currentTurn
+                            })
+                            )
+                        },
+                        REQ_MOVES_FOR_UNIT: {
+                            actions: respond((context, event: UnitMoveEvents) => {
+                                let unit = getUnit(event.id, context.gameBoard).ref.getSnapshot().context
+                                let [unitY, unitX] = getUnitLocation(event.id, context.gameBoard)
 
-                                    let moves = [] as { type: moveType, location: location }[]
-                                    for (let rowIndex in context.gameBoard) {
-                                        for (let colIndex in context.gameBoard[rowIndex]) {
-                                            if (isInHexCoordArray(attackableFields, gameBoard[rowIndex][colIndex].hexCoordinate)) {
-                                                let unit = gameBoard[rowIndex][colIndex].unit;
-                                                if (unit.id !== '' && unit.ref.getSnapshot().context.empire !== context.currentEmpire) {
-                                                    moves.push({
-                                                        type: moveType.attack,
-                                                        location: {x: parseInt(colIndex), y: parseInt(rowIndex)}
-                                                    })
-                                                }
+                                let attackableFields = getAllNeighbours(unitX, unitY, unit.attackRange, context.gameBoard)
+                                let movableFields = getAllNeighbours(unitX, unitY, unit.moveRange, context.gameBoard)
+
+                                let moves = [] as { type: moveType, location: location }[]
+                                for (let rowIndex in context.gameBoard) {
+                                    for (let colIndex in context.gameBoard[rowIndex]) {
+                                        if (isInHexCoordArray(attackableFields, gameBoard[rowIndex][colIndex].hexCoordinate)) {
+                                            let unit = gameBoard[rowIndex][colIndex].unit;
+                                            if (unit.id !== '' && unit.ref.getSnapshot().context.empire !== context.currentEmpire) {
+                                                moves.push({
+                                                    type: moveType.attack,
+                                                    location: { x: parseInt(colIndex), y: parseInt(rowIndex) }
+                                                })
                                             }
-                                            if (isInHexCoordArray(movableFields, gameBoard[rowIndex][colIndex].hexCoordinate)) {
-                                                if (gameBoard[rowIndex][colIndex].unit.id === '') {
-                                                    moves.push({
-                                                        type: moveType.move,
-                                                        location: {x: parseInt(colIndex), y: parseInt(rowIndex)}
-                                                    })
-                                                }
+                                        }
+                                        if (isInHexCoordArray(movableFields, gameBoard[rowIndex][colIndex].hexCoordinate)) {
+                                            if (gameBoard[rowIndex][colIndex].unit.id === '') {
+                                                moves.push({
+                                                    type: moveType.move,
+                                                    location: { x: parseInt(colIndex), y: parseInt(rowIndex) }
+                                                })
                                             }
                                         }
                                     }
-
-                                    return {
-                                        type: 'POSSIBLE_MOVES',
-                                        moves: moves
-                                    }
-                                })
-                            }
-                        }
-                    },
-                    cleanUpGameBoard: {
-                        on: {
-                            DEAD: [
-                                {
-                                    cond: 'unitIsBase',
-                                    actions: 'removeEmpire'
-                                },
-                                {
-                                    actions: 'removeDeadUnit'
                                 }
-                            ]
+
+                                return {
+                                    type: 'POSSIBLE_MOVES',
+                                    moves: moves
+                                }
+                            })
                         }
                     }
+                },
+                cleanUpGameBoard: {
+                    on: {
+                        DEAD: [
+                            {
+                                cond: 'unitIsBase',
+                                actions: 'removeEmpire'
+                            },
+                            {
+                                actions: 'removeDeadUnit'
+                            }
+                        ]
+                    }
                 }
-            },
-        }
-    },
+            }
+        },
+    }
+},
     {
         actions: {
             checkProducer: assign<GameBoardContext>({
@@ -521,7 +520,7 @@ export const createGameBoardMachine = (gameBoard: GameBoardField[][]) => createM
                             initialContext = archerContext
                             productionTime = archerContext.productionTime
                             break;
-                        case  units.Spearman:
+                        case units.Spearman:
                             initialContext = spearmanContext
                             productionTime = spearmanContext.productionTime
                             break;
@@ -563,9 +562,9 @@ export const createGameBoardMachine = (gameBoard: GameBoardField[][]) => createM
                         if (unit.id !== '') {
                             let unitSnap = unit.ref.getSnapshot();
                             if (unitSnap.context.empire === context.currentEmpire && unitSnap.context.type !== units.Base) {
-                                actions.push(send('MOVABLE', {to: unit.ref}))
+                                actions.push(send('MOVABLE', { to: unit.ref }))
                             } else {
-                                actions.push(send('NOT_MOVABLE', {to: unit.ref}))
+                                actions.push(send('NOT_MOVABLE', { to: unit.ref }))
                             }
                         }
                     }
@@ -600,10 +599,10 @@ export const createGameBoardMachine = (gameBoard: GameBoardField[][]) => createM
                 gameBoard: (context, event) => {
                     let temp = context.gameBoard;
                     const spawnPoints = [
-                        {x: 1, y: 1},
-                        {x: 1, y: context.gameBoard.length - 2},
-                        {x: context.gameBoard[0].length - 2, y: 1},
-                        {x: context.gameBoard[0].length - 2, y: context.gameBoard.length - 2}
+                        { x: 1, y: 1 },
+                        { x: 1, y: context.gameBoard.length - 2 },
+                        { x: context.gameBoard[0].length - 2, y: 1 },
+                        { x: context.gameBoard[0].length - 2, y: context.gameBoard.length - 2 }
                     ]
                     for (let point of spawnPoints) {
                         if (targetNotOccupied(point.x, point.y, context.gameBoard)) {
@@ -715,8 +714,8 @@ export const createGameBoardMachine = (gameBoard: GameBoardField[][]) => createM
                     const targetUnit: UnitContext = targetUnitRef.getSnapshot().context
 
                     const distance = getDistance(
-                        {x: col, y: row},
-                        {x: event.x, y: event.y},
+                        { x: col, y: row },
+                        { x: event.x, y: event.y },
                         context.gameBoard
                     );
 
@@ -786,8 +785,8 @@ export const createGameBoardMachine = (gameBoard: GameBoardField[][]) => createM
                 const [row, col] = getUnitLocation(event.id, context.gameBoard);
                 const sourceUnit = getUnit(event.id, context.gameBoard).ref.getSnapshot();
                 const distance = getDistance(
-                    {x: col, y: row},
-                    {x: event.x, y: event.y},
+                    { x: col, y: row },
+                    { x: event.x, y: event.y },
                     context.gameBoard
                 );
 

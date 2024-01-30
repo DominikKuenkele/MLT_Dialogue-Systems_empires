@@ -1,13 +1,13 @@
-import {Status} from "./Status";
-import {asEffect, useMachine} from "@xstate/react";
-import {gameMachine} from "../machines/GameMachine";
-import {assign, spawn} from "xstate";
+import { asEffect, useMachine } from "@xstate/react";
 import uuid from "uuid-v4";
-import {createGameBoardMachine, Producer} from "../machines/GameBoardMachine";
-import {dummyRef} from "../Util";
-import {GameBoard} from "./GameBoard";
 import createSpeechRecognitionPonyfill from "web-speech-cognitive-services/lib/SpeechServices/SpeechToText";
-import {createSpeechRecognitionMachine, SRMContext, SRMEvents} from "../machines/SpeechRecognitionMachine";
+import { assign, spawn } from "xstate";
+import { dummyRef } from "../Util";
+import { Producer, createGameBoardMachine } from "../machines/GameBoardMachine";
+import { gameMachine } from "../machines/GameMachine";
+import { SRMContext, createSpeechRecognitionMachine } from "../machines/SpeechRecognitionMachine";
+import { GameBoard } from "./GameBoard";
+import { Status } from "./Status";
 
 
 const createDefaultGameBoard = (x: number, y: number) => {
@@ -64,14 +64,14 @@ export function Game() {
             }),
             ponyfillASR: asEffect((context: SRMContext) => {
                 const
-                    {SpeechRecognition}
+                    { SpeechRecognition }
                         = createSpeechRecognitionPonyfill({
-                        audioContext: context.audioCtx,
-                        credentials: {
-                            region: REGION,
-                            authorizationToken: context.azureAuthorizationToken,
-                        }
-                    });
+                            audioContext: context.audioCtx,
+                            credentials: {
+                                region: REGION,
+                                authorizationToken: context.azureAuthorizationToken,
+                            }
+                        });
                 context.asr = new SpeechRecognition()
                 context.asr.lang = process.env.REACT_APP_ASR_LANGUAGE || 'en-US'
                 context.asr.continuous = true
@@ -87,7 +87,7 @@ export function Game() {
                             }]
                         })
                     } else {
-                        speechSend({type: "STARTSPEECH"});
+                        speechSend({ type: "STARTSPEECH" });
                     }
                 }
             }),
@@ -108,16 +108,16 @@ export function Game() {
         ref: speechInterpret
     }
     const [gameState, gameSend] = useMachine(gameMachine(speechMachineRef), {
-            devTools: true,
-            actions: {
-                createGameBoard: assign({
-                    gameBoard: () => ({
-                        id: uuid(),
-                        ref: spawn(createGameBoardMachine(createDefaultGameBoard(number_tiles_x, number_tiles_y)), 'gameBoard')
-                    })
+        devTools: true,
+        actions: {
+            createGameBoard: assign({
+                gameBoard: () => ({
+                    id: uuid(),
+                    ref: spawn(createGameBoardMachine(createDefaultGameBoard(number_tiles_x, number_tiles_y)), 'gameBoard')
                 })
-            }
+            })
         }
+    }
     );
 
     const currentEmpire = gameState.context.currentEmpire.id !== '' ?
@@ -143,17 +143,17 @@ export function Game() {
             case 'idle':
             //fallthrough
             case 'settingUp:':
-                return <div className={'start-button'} onClick={() => gameSend({type: 'START'})}>Start Game</div>
+                return <div className={'start-button'} onClick={() => gameSend({ type: 'START' })}>Start Game</div>
             default:
                 return (
                     <div className={'game'}>
                         <Status turn={gameState.context.turn}
-                                production={production()}
+                            production={production()}
                         />
                         <GameBoard numberTilesX={number_tiles_x}
-                                   numberTileY={number_tiles_y}
-                                   tileSize={tile_size}
-                                   gameBoardRef={gameState.context.gameBoard.ref}/>
+                            numberTileY={number_tiles_y}
+                            tileSize={tile_size}
+                            gameBoardRef={gameState.context.gameBoard.ref} />
                     </div>
                 )
         }

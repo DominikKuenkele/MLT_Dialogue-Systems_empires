@@ -1,8 +1,7 @@
 import React from 'react';
-import {Hexagon, Text} from 'react-hexgrid';
-import {GamePiece} from "./GamePiece";
-import {ActorRef} from "xstate";
-import {createUnitMachine} from "../machines/UnitMachine";
+import { Hexagon, Text } from 'react-hexgrid';
+import { ActorRef } from "xstate";
+import { GamePiece } from "./GamePiece";
 
 
 interface GameTileProps {
@@ -13,15 +12,15 @@ interface GameTileProps {
     unitId: string
 }
 
-function hexToChess(q: number, r: number, s: number){
-    return `${(q + 10).toString(36).toUpperCase()}${Math.floor((r-s)/2)+1}`
+function hexToChess(q: number, r: number, s: number) {
+    return `${(q + 10).toString(36).toUpperCase()}${Math.floor((r - s) / 2) + 1}`
 }
 
 export function GameTile(props: GameTileProps) {
     const unitMovable = () => props.unitId !== '' && props.unitRef.getSnapshot().context.movable ? 'movable' : ''
     return (
         <Hexagon q={props.q} r={props.r} s={props.s} className={unitMovable()}>
-            {Object.entries(props.unitRef).length !== 0 && <GamePiece unitRef={props.unitRef} unitId={props.unitId}/>}
+            {Object.entries(props.unitRef).length !== 0 && <GamePiece unitRef={props.unitRef} unitId={props.unitId} />}
             <Text y={4.5}>{hexToChess(props.q, props.r, props.s)}</Text>
         </Hexagon>
     );
